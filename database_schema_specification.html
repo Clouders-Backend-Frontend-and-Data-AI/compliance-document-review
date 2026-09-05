@@ -1,0 +1,1213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Database Architecture & Schema Specification</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+  @page {
+    size: A4 portrait;
+    margin: 10mm 12mm 10mm 12mm;
+    @bottom-right {
+      content: "Page " counter(page);
+    }
+  }
+
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    color: #1e293b;
+    background-color: #ffffff;
+    line-height: 1.38;
+    font-size: 8.5pt;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .header-card {
+    background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
+    color: #ffffff;
+    padding: 16px 20px;
+    border-radius: 8px;
+    margin-bottom: 12px;
+  }
+
+  .badge-top {
+    display: inline-block;
+    background: rgba(99, 102, 241, 0.25);
+    border: 1px solid rgba(165, 180, 252, 0.4);
+    color: #c7d2fe;
+    font-size: 7pt;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    padding: 3px 8px;
+    border-radius: 10px;
+    margin-bottom: 6px;
+  }
+
+  .header-title {
+    font-size: 19pt;
+    font-weight: 800;
+    color: #ffffff;
+    line-height: 1.15;
+    letter-spacing: -0.4px;
+    margin-bottom: 4px;
+  }
+
+  .header-desc {
+    font-size: 8.5pt;
+    color: #cbd5e1;
+    max-width: 650px;
+    line-height: 1.35;
+  }
+
+  .meta-pills-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 10px;
+    padding-top: 8px;
+    border-top: 1px solid rgba(255, 255, 255, 0.12);
+  }
+
+  .meta-pill {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 7.5pt;
+    color: #e2e8f0;
+  }
+  .meta-pill strong {
+    color: #a5b4fc;
+  }
+
+  /* Headings */
+  h1 {
+    font-size: 12pt;
+    font-weight: 800;
+    color: #0f172a;
+    border-bottom: 2px solid #4f46e5;
+    padding-bottom: 3px;
+    margin-top: 6px;
+    margin-bottom: 8px;
+    letter-spacing: -0.3px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  h2 {
+    font-size: 9.5pt;
+    font-weight: 700;
+    color: #1e293b;
+    margin-top: 6px;
+    margin-bottom: 4px;
+  }
+
+  p {
+    margin-bottom: 6px;
+    color: #334155;
+    font-size: 8pt;
+  }
+
+  .page-break {
+    page-break-before: always;
+  }
+
+  .no-break {
+    page-break-inside: avoid;
+  }
+
+  /* Grid Layout */
+  .grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+
+  .domain-card {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    padding: 8px 10px;
+  }
+
+  .domain-card h3 {
+    font-size: 8.5pt;
+    font-weight: 700;
+    margin-bottom: 2px;
+  }
+
+  .domain-card p {
+    font-size: 7.5pt;
+    color: #64748b;
+    margin-bottom: 4px;
+    line-height: 1.3;
+  }
+
+  .pill-tag {
+    display: inline-block;
+    background: #e2e8f0;
+    color: #1e293b;
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-size: 7pt;
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 600;
+    margin-right: 3px;
+  }
+
+  /* Tables */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 3px;
+    margin-bottom: 8px;
+    font-size: 7.5pt;
+    background: #ffffff;
+    border: 1px solid #cbd5e1;
+    border-radius: 5px;
+    overflow: hidden;
+  }
+
+  th {
+    background-color: #0f172a;
+    color: #f8fafc;
+    text-align: left;
+    padding: 4px 6px;
+    font-weight: 600;
+    font-size: 7.5pt;
+    letter-spacing: 0.2px;
+  }
+
+  td {
+    padding: 3.5px 6px;
+    border-bottom: 1px solid #e2e8f0;
+    vertical-align: top;
+    color: #334155;
+    line-height: 1.3;
+  }
+
+  tr:nth-child(even) td {
+    background-color: #f8fafc;
+  }
+
+  tr:last-child td {
+    border-bottom: none;
+  }
+
+  /* Code and Badges */
+  code, .col-name {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 7pt;
+    font-weight: 600;
+    color: #0959aa;
+    background: #f1f5f9;
+    padding: 1px 3px;
+    border-radius: 3px;
+    display: inline-block;
+  }
+
+  .type-tag {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 7pt;
+    color: #475569;
+  }
+
+  .badge {
+    display: inline-block;
+    padding: 1px 3px;
+    border-radius: 2px;
+    font-size: 6pt;
+    font-weight: 700;
+    text-transform: uppercase;
+    margin-right: 2px;
+    letter-spacing: 0.2px;
+  }
+
+  .badge-pk { background: #dbeafe; color: #1e40af; border: 1px solid #bfdbfe; }
+  .badge-fk { background: #fef3c7; color: #92400e; border: 1px solid #fde68a; }
+  .badge-uq { background: #e0e7ff; color: #4338ca; border: 1px solid #c7d2fe; }
+  .badge-idx { background: #f3e8ff; color: #6b21a8; border: 1px solid #e9d5ff; }
+  .badge-nn { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
+  .badge-opt { background: #f1f5f9; color: #64748b; border: 1px solid #e2e8f0; }
+
+  .table-header-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #f1f5f9;
+    border-left: 3px solid #4f46e5;
+    padding: 3px 6px;
+    margin-top: 6px;
+    margin-bottom: 3px;
+    border-radius: 0 4px 4px 0;
+  }
+
+  .table-header-title {
+    font-weight: 700;
+    font-size: 8.5pt;
+    color: #0f172a;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .table-header-desc {
+    font-size: 7pt;
+    color: #64748b;
+  }
+
+  .erd-box {
+    background: #0f172a;
+    border-radius: 6px;
+    padding: 10px;
+    margin: 8px 0 6px 0;
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+
+<!-- PAGE 1: OVERVIEW & ERD -->
+<div>
+  <div class="header-card">
+    <span class="badge-top">Database Architecture Specification</span>
+    <div class="header-title">Database Schema & Entity Models</div>
+    <div class="header-desc">Technical specification for the Document Review & AI Compliance Platform with zero-knowledge PII vault and RAG vector corpus.</div>
+    <div class="meta-pills-row">
+      <div class="meta-pill"><strong>ORM:</strong> SQLAlchemy 2.0 (Declarative Base)</div>
+      <div class="meta-pill"><strong>Engine:</strong> SQLite 3 / PostgreSQL 14+</div>
+      <div class="meta-pill"><strong>Key Standard:</strong> UUIDv4 (36-char)</div>
+      <div class="meta-pill"><strong>Total Entities:</strong> 10 Tables (6 Enums)</div>
+    </div>
+  </div>
+
+  <h1>1. Architectural Domains</h1>
+  <div class="grid-2">
+    <div class="domain-card">
+      <h3 style="color: #4338ca;">&bull; Authentication & Users</h3>
+      <p>Role-based access control separating Advisors (authors) and Compliance Officers (reviewers).</p>
+      <div><span class="pill-tag">users</span> <span class="pill-tag">notifications</span></div>
+    </div>
+
+    <div class="domain-card">
+      <h3 style="color: #0369a1;">&bull; Document & Revisions</h3>
+      <p>Hierarchical document storage with self-referential revision threads (<code>thread_id</code> lineage).</p>
+      <div><span class="pill-tag">documents</span> <span class="pill-tag">review_decisions</span></div>
+    </div>
+
+    <div class="domain-card">
+      <h3 style="color: #b45309;">&bull; AI Compliance Engine</h3>
+      <p>Automated pre-review violation scans linking extracted passages with SEC/FINRA rule criteria.</p>
+      <div><span class="pill-tag">ai_analyses</span> <span class="pill-tag">compliance_flags</span></div>
+    </div>
+
+    <div class="domain-card">
+      <h3 style="color: #15803d;">&bull; Audit, PII Vault & RAG Corpus</h3>
+      <p>Immutable audit trail, isolated local PII de-identification vault, and vectorized regulatory rules.</p>
+      <div><span class="pill-tag">audit_events</span> <span class="pill-tag">pii_mappings</span> <span class="pill-tag">compliance_rules</span> <span class="pill-tag">precedent_submissions</span></div>
+    </div>
+  </div>
+
+  <h2>Entity Relationship Overview (ERD)</h2>
+  <div class="erd-box">
+    <svg width="100%" height="210" viewBox="0 0 740 210" xmlns="http://www.w3.org/2000/svg" style="font-family: 'JetBrains Mono', monospace;">
+      <defs>
+        <marker id="arrow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M 0 1 L 10 5 L 0 9 z" fill="#6366f1" />
+        </marker>
+      </defs>
+
+      <!-- Users Node -->
+      <rect x="20" y="15" width="130" height="50" rx="5" fill="#1e1b4b" stroke="#6366f1" stroke-width="1.5" />
+      <text x="85" y="36" fill="#e0e7ff" font-size="10" font-weight="bold" text-anchor="middle">users</text>
+      <text x="85" y="52" fill="#94a3b8" font-size="7.5" text-anchor="middle">PK: id | role, email</text>
+
+      <!-- Documents Node -->
+      <rect x="230" y="15" width="140" height="50" rx="5" fill="#0f2b48" stroke="#38bdf8" stroke-width="1.5" />
+      <text x="300" y="36" fill="#e0f2fe" font-size="10" font-weight="bold" text-anchor="middle">documents</text>
+      <text x="300" y="52" fill="#94a3b8" font-size="7.5" text-anchor="middle">PK: id | thread_id, status</text>
+
+      <!-- AI Analysis Node -->
+      <rect x="450" y="15" width="130" height="50" rx="5" fill="#3b1e08" stroke="#fb923c" stroke-width="1.5" />
+      <text x="515" y="36" fill="#ffedd5" font-size="10" font-weight="bold" text-anchor="middle">ai_analyses</text>
+      <text x="515" y="52" fill="#94a3b8" font-size="7.5" text-anchor="middle">1:1 FK: document_id</text>
+
+      <!-- Compliance Flags Node -->
+      <rect x="610" y="15" width="115" height="50" rx="5" fill="#2d1215" stroke="#f87171" stroke-width="1.5" />
+      <text x="667" y="36" fill="#fee2e2" font-size="9" font-weight="bold" text-anchor="middle">compliance_flags</text>
+      <text x="667" y="52" fill="#94a3b8" font-size="7" text-anchor="middle">FK: analysis_id</text>
+
+      <!-- Review Decisions Node -->
+      <rect x="230" y="125" width="140" height="48" rx="5" fill="#1e293b" stroke="#94a3b8" stroke-width="1" />
+      <text x="300" y="146" fill="#f8fafc" font-size="9.5" font-weight="bold" text-anchor="middle">review_decisions</text>
+      <text x="300" y="161" fill="#94a3b8" font-size="7.5" text-anchor="middle">FK: document_id, officer_id</text>
+
+      <!-- Audit Events Node -->
+      <rect x="20" y="125" width="130" height="48" rx="5" fill="#1e293b" stroke="#94a3b8" stroke-width="1" />
+      <text x="85" y="146" fill="#f8fafc" font-size="9.5" font-weight="bold" text-anchor="middle">audit_events</text>
+      <text x="85" y="161" fill="#94a3b8" font-size="7.5" text-anchor="middle">FK: document_id, actor_id</text>
+
+      <!-- PII Mapping Node -->
+      <rect x="450" y="125" width="130" height="48" rx="5" fill="#064e3b" stroke="#34d399" stroke-width="1" />
+      <text x="515" y="146" fill="#d1fae5" font-size="9.5" font-weight="bold" text-anchor="middle">pii_mappings</text>
+      <text x="515" y="161" fill="#94a3b8" font-size="7.5" text-anchor="middle">FK: document_id</text>
+
+      <!-- Vector Corpus Nodes -->
+      <rect x="610" y="125" width="115" height="48" rx="5" fill="#14532d" stroke="#4ade80" stroke-width="1" />
+      <text x="667" y="146" fill="#dcfce7" font-size="8.5" font-weight="bold" text-anchor="middle">compliance_rules</text>
+      <text x="667" y="161" fill="#86efac" font-size="7" text-anchor="middle">Vectorized SEC Rules</text>
+
+      <!-- Connections -->
+      <line x1="150" y1="40" x2="222" y2="40" stroke="#6366f1" stroke-width="1.5" marker-end="url(#arrow)" />
+      <text x="185" y="34" fill="#a5b4fc" font-size="7" text-anchor="middle">advisor_id</text>
+
+      <line x1="370" y1="40" x2="442" y2="40" stroke="#38bdf8" stroke-width="1.5" marker-end="url(#arrow)" />
+      <text x="408" y="34" fill="#7dd3fc" font-size="7" text-anchor="middle">1-to-1</text>
+
+      <line x1="580" y1="40" x2="602" y2="40" stroke="#fb923c" stroke-width="1.5" marker-end="url(#arrow)" />
+
+      <line x1="300" y1="65" x2="300" y2="117" stroke="#38bdf8" stroke-width="1.5" marker-end="url(#arrow)" />
+
+      <line x1="370" y1="58" x2="445" y2="130" stroke="#38bdf8" stroke-width="1.2" stroke-dasharray="3,3" marker-end="url(#arrow)" />
+
+      <line x1="230" y1="58" x2="145" y2="130" stroke="#38bdf8" stroke-width="1.2" stroke-dasharray="3,3" marker-end="url(#arrow)" />
+    </svg>
+  </div>
+</div>
+
+<!-- PAGE 2: ENUMS & ENTITIES (USERS, DOCUMENTS) -->
+<div class="page-break"></div>
+
+<h1>2. Enumerations & Core Tables</h1>
+
+<h2>Statically Enforced Enums</h2>
+<table>
+  <thead>
+    <tr>
+      <th style="width: 25%;">Enum Type</th>
+      <th style="width: 35%;">Allowed Values</th>
+      <th style="width: 40%;">Description / Usage</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>UserRole</code></td>
+      <td><code>advisor</code>, <code>officer</code></td>
+      <td>Access tier gating submission vs officer review portals</td>
+    </tr>
+    <tr>
+      <td><code>DocumentStatus</code></td>
+      <td><code>pending_review</code>, <code>approved</code>, <code>rejected</code>, <code>needs_revision</code></td>
+      <td>Document workflow state & precedent decisions</td>
+    </tr>
+    <tr>
+      <td><code>DocumentType</code></td>
+      <td><code>marketing_email</code>, <code>brochure</code>, <code>social_post</code>, <code>meeting_notes</code>, <code>proposal_letter</code>, <code>other</code></td>
+      <td>Filing classification for contextual prompt selection</td>
+    </tr>
+    <tr>
+      <td><code>AuditAction</code></td>
+      <td><code>submitted</code>, <code>viewed</code>, <code>decided</code>, <code>resubmitted</code>, <code>analysis_generated</code>, <code>downloaded</code></td>
+      <td>Immutable compliance trail action taxonomy</td>
+    </tr>
+    <tr>
+      <td><code>FlagSeverity</code></td>
+      <td><code>critical</code>, <code>high</code>, <code>medium</code>, <code>low</code></td>
+      <td>AI-detected compliance risk score</td>
+    </tr>
+    <tr>
+      <td><code>RuleCategory</code></td>
+      <td><code>required_disclosure</code>, <code>prohibited_claims</code>, <code>performance_standards</code>, <code>supervision</code></td>
+      <td>SEC/FINRA regulatory domain indexing</td>
+    </tr>
+  </tbody>
+</table>
+
+<!-- TABLE 1: USERS -->
+<div class="no-break">
+  <div class="table-header-bar">
+    <div class="table-header-title">1. users</div>
+    <div class="table-header-desc">User accounts, roles, and authentication credentials</div>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 20%;">Column</th>
+        <th style="width: 20%;">Type</th>
+        <th style="width: 22%;">Modifiers</th>
+        <th style="width: 38%;">Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="col-name">id</span></td>
+        <td class="type-tag">VARCHAR(36)</td>
+        <td><span class="badge badge-pk">PK</span> <span class="badge badge-nn">NN</span></td>
+        <td>UUIDv4 primary key</td>
+      </tr>
+      <tr>
+        <td><span class="col-name">email</span></td>
+        <td class="type-tag">VARCHAR(255)</td>
+        <td><span class="badge badge-uq">UQ</span> <span class="badge badge-idx">IDX</span> <span class="badge badge-nn">NN</span></td>
+        <td>User unique login email address</td>
+      </tr>
+      <tr>
+        <td><span class="col-name">hashed_password</span></td>
+        <td class="type-tag">VARCHAR(255)</td>
+        <td><span class="badge badge-nn">NN</span></td>
+        <td>Bcrypt hashed password string</td>
+      </tr>
+      <tr>
+        <td><span class="col-name">full_name</span></td>
+        <td class="type-tag">VARCHAR(255)</td>
+        <td><span class="badge badge-nn">NN</span></td>
+        <td>User display / legal name</td>
+      </tr>
+      <tr>
+        <td><span class="col-name">role</span></td>
+        <td class="type-tag">Enum(UserRole)</td>
+        <td><span class="badge badge-nn">NN</span></td>
+        <td><code>advisor</code> or <code>officer</code></td>
+      </tr>
+      <tr>
+        <td><span class="col-name">created_at</span></td>
+        <td class="type-tag">DATETIME</td>
+        <td><span class="badge badge-nn">NN</span></td>
+        <td>Account creation timestamp (UTC)</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- TABLE 2: DOCUMENTS -->
+<div class="no-break">
+  <div class="table-header-bar">
+    <div class="table-header-title">2. documents</div>
+    <div class="table-header-desc">Compliance submissions, metadata, extracted text, and revision links</div>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 20%;">Column</th>
+        <th style="width: 20%;">Type</th>
+        <th style="width: 22%;">Modifiers</th>
+        <th style="width: 38%;">Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="col-name">id</span></td>
+        <td class="type-tag">VARCHAR(36)</td>
+        <td><span class="badge badge-pk">PK</span> <span class="badge badge-nn">NN</span></td>
+        <td>UUIDv4 document primary key</td>
+      </tr>
+      <tr>
+        <td><span class="col-name">advisor_id</span></td>
+        <td class="type-tag">VARCHAR(36)</td>
+        <td><span class="badge badge-fk">FK users.id</span> <span class="badge badge-idx">IDX</span> <span class="badge badge-nn">NN</span></td>
+        <td>Authoring advisor account ID</td>
+      </tr>
+      <tr>
+        <td><span class="col-name">title</span></td>
+        <td class="type-tag">VARCHAR(255)</td>
+        <td><span class="badge badge-nn">NN</span></td>
+        <td>Document submission title</td>
+      </tr>
+      <tr>
+        <td><span class="col-name">document_type</span></td>
+        <td class="type-tag">Enum(DocumentType)</td>
+        <td><span class="badge badge-nn">NN</span> (Default: <code>other</code>)</td>
+        <td>Classification type (marketing email, brochure, etc.)</td>
+      </tr>
+      <tr>
+        <td><span class="col-name">status</span></td>
+        <td class="type-tag">Enum(DocumentStatus)</td>
+        <td><span class="badge badge-idx">IDX</span> <span class="badge badge-nn">NN</span> (Default: <code>pending_review</code>)</td>
+        <td>Workflow status (pending, approved, rejected, revision)</td>
+      </tr>
+      <tr>
+        <td><span class="col-name">file_name</span></td>
+        <td class="type-tag">VARCHAR(255)</td>
+        <td><span class="badge badge-nn">NN</span></td>
+        <td>Original uploaded filename</td>
+      </tr>
+      <tr>
+        <td><span class="col-name">file_path</span></td>
+        <td class="type-tag">VARCHAR(512)</td>
+        <td><span class="badge badge-nn">NN</span></td>
+        <td>Absolute/relative path on disk</td>
+      </tr>
+      <tr>
+        <td><span class="col-name">file_size</span></td>
+        <td class="type-tag">INTEGER</td>
+        <td><span class="badge badge-nn">NN</span></td>
+        <td>File size in bytes</td>
+      </tr>
+      <tr>
+        <td><span class="col-name">mime_type</span></td>
+        <td class="type-tag">VARCHAR(100)</td>
+        <td><span class="badge badge-nn">NN</span></td>
+        <td>MIME format (application/pdf, text/plain, etc.)</td>
+      </tr>
+      <tr>
+        <td><span class="col-name">extracted_text</span></td>
+        <td class="type-tag">TEXT</td>
+        <td><span class="badge badge-opt">OPT</span></td>
+        <td>Plaintext parsed from document file</td>
+      </tr>
+      <tr>
+        <td><span class="col-name">thread_id</span></td>
+        <td class="type-tag">VARCHAR(36)</td>
+        <td><span class="badge badge-idx">IDX</span> <span class="badge badge-nn">NN</span></td>
+        <td>Groups all revisions of the same submission</td>
+      </tr>
+      <tr>
+        <td><span class="col-name">parent_document_id</span></td>
+        <td class="type-tag">VARCHAR(36)</td>
+        <td><span class="badge badge-fk">FK documents.id</span> <span class="badge badge-idx">IDX</span> <span class="badge badge-opt">OPT</span></td>
+        <td>Preceding document ID in version sequence</td>
+      </tr>
+      <tr>
+        <td><span class="col-name">version_number</span></td>
+        <td class="type-tag">INTEGER</td>
+        <td><span class="badge badge-nn">NN</span> (Default: <code>1</code>)</td>
+        <td>Version sequence counter</td>
+      </tr>
+      <tr>
+        <td><span class="col-name">uploaded_at</span></td>
+        <td class="type-tag">DATETIME</td>
+        <td><span class="badge badge-nn">NN</span></td>
+        <td>UTC submission timestamp</td>
+      </tr>
+      <tr>
+        <td><span class="col-name">updated_at</span></td>
+        <td class="type-tag">DATETIME</td>
+        <td><span class="badge badge-nn">NN</span></td>
+        <td>UTC last modified timestamp</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- PAGE 3: REVIEW DECISIONS, AI ANALYSIS & COMPLIANCE FLAGS -->
+<div class="page-break"></div>
+
+<h1>3. Review & AI Compliance Analysis</h1>
+
+<!-- TABLE 3: REVIEW DECISIONS -->
+<div class="no-break">
+  <div class="table-header-bar">
+    <div class="table-header-title">3. review_decisions</div>
+    <div class="table-header-desc">Compliance officer final verdicts, notes, and timestamps</div>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 20%;">Column</th>
+        <th style="width: 20%;">Type</th>
+        <th style="width: 22%;">Modifiers</th>
+        <th style="width: 38%;">Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="col-name">id</span></td>
+        <td class="type-tag">VARCHAR(36)</td>
+        <td><span class="badge badge-pk">PK</span> <span class="badge badge-nn">NN</span></td>
+        <td>UUIDv4 decision primary key</td>
+      </tr>
+      <tr>
+        <td><span class="col-name">document_id</span></td>
+        <td class="type-tag">VARCHAR(36)</td>
+        <td><span class="badge badge-fk">FK documents.id</span> <span class="badge badge-idx">IDX</span> <span class="badge badge-nn">NN</span></td>
+        <td>Reviewed document ID</td>
+      </tr>
+      <tr>
+        <td><span class="col-name">officer_id</span></td>
+        <td class="type-tag">VARCHAR(36)</td>
+        <td><span class="badge badge-fk">FK users.id</span> <span class="badge badge-idx">IDX</span> <span class="badge badge-nn">NN</span></td>
+        <td>Compliance Officer who performed review</td>
+      </tr>
+      <tr>
+        <td><span class="col-name">status</span></td>
+        <td class="type-tag">Enum(DocumentStatus)</td>
+        <td><span class="badge badge-nn">NN</span></td>
+        <td>Decision state: <code>approved</code>, <code>rejected</code>, <code>needs_revision</code></td>
+      </tr>
+      <tr>
+        <td><span class="col-name">comment</span></td>
+        <td class="type-tag">TEXT</td>
+        <td><span class="badge badge-nn">NN</span></td>
+        <td>Officer feedback, reasoning, and instructions</td>
+      </tr>
+      <tr>
+        <td><span class="col-name">decided_at</span></td>
+        <td class="type-tag">DATETIME</td>
+        <td><span class="badge badge-nn">NN</span></td>
+        <td>Timestamp of decision</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- TABLE 4: AI ANALYSES -->
+<div class="no-break">
+  <div class="table-header-bar">
+    <div class="table-header-title">4. ai_analyses</div>
+    <div class="table-header-desc">1-to-1 AI evaluation summaries, model metadata, and sanitized payload audit</div>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 20%;">Column</th>
+        <th style="width: 20%;">Type</th>
+        <th style="width: 22%;">Modifiers</th>
+        <th style="width: 38%;">Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="col-name">id</span></td>
+        <td class="type-tag">VARCHAR(36)</td>
+        <td><span class="badge badge-pk">PK</span> <span class="badge badge-nn">NN</span></td>
+        <td>UUIDv4 AI analysis primary key</td>
+      </tr>
+      <tr>
+        <td><span class="col-name">document_id</span></td>
+        <td class="type-tag">VARCHAR(36)</td>
+        <td><span class="badge badge-fk">FK documents.id</span> <span class="badge badge-uq">UQ</span> <span class="badge badge-idx">IDX</span> <span class="badge badge-nn">NN</span></td>
+        <td>1-to-1 foreign key to analyzed document</td>
+      </tr>
+      <tr>
+        <td><span class="col-name">summary</span></td>
+        <td class="type-tag">TEXT</td>
+        <td><span class="badge badge-nn">NN</span></td>
+        <td>Executive summary generated by LLM</td>
+      </tr>
+      <tr>
+        <td><span class="col-name">outbound_payload_masked</span></td>
+        <td class="type-tag">TEXT</td>
+        <td><span class="badge badge-opt">OPT</span></td>
+        <td>Audit snapshot of de-identified payload sent to AI</td>
+      </tr>
+      <tr>
+        <td><span class="col-name">status</span></td>
+        <td class="type-tag">VARCHAR(50)</td>
+        <td><span class="badge badge-nn">NN</span> (Default: <code>completed</code>)</td>
+        <td>Status: <code>completed</code>, <code>degraded</code>, or <code>failed</code></td>
+      </tr>
+      <tr>
+        <td><span class="col-name">model_used</span></td>
+        <td class="type-tag">VARCHAR(100)</td>
+        <td><span class="badge badge-nn">NN</span> (Default: <code>gemini-1.5-flash</code>)</td>
+        <td>Model version used for analysis</td>
+      </tr>
+      <tr>
+        <td><span class="col-name">generated_at</span></td>
+        <td class="type-tag">DATETIME</td>
+        <td><span class="badge badge-nn">NN</span></td>
+        <td>Completion timestamp</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- TABLE 5: COMPLIANCE FLAGS -->
+<div class="no-break">
+  <div class="table-header-bar">
+    <div class="table-header-title">5. compliance_flags</div>
+    <div class="table-header-desc">Granular risk violations, rule citations, excerpts, and suggested fixes</div>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 20%;">Column</th>
+        <th style="width: 20%;">Type</th>
+        <th style="width: 22%;">Modifiers</th>
+        <th style="width: 38%;">Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="col-name">id</span></td>
+        <td class="type-tag">VARCHAR(36)</td>
+        <td><span class="badge badge-pk">PK</span> <span class="badge badge-nn">NN</span></td>
+        <td>UUIDv4 violation flag primary key</td>
+      </tr>
+      <tr>
+        <td><span class="col-name">analysis_id</span></td>
+        <td class="type-tag">VARCHAR(36)</td>
+        <td><span class="badge badge-fk">FK ai_analyses.id</span> <span class="badge badge-idx">IDX</span> <span class="badge badge-nn">NN</span></td>
+        <td>Parent AI analysis record ID</td>
+      </tr>
+      <tr>
+        <td><span class="col-name">passage_excerpt</span></td>
+        <td class="type-tag">TEXT</td>
+        <td><span class="badge badge-nn">NN</span></td>
+        <td>Exact text from document triggering violation</td>
+      </tr>
+      <tr>
+        <td><span class="col-name">matched_rule_id</span></td>
+        <td class="type-tag">VARCHAR(100)</td>
+        <td><span class="badge badge-opt">OPT</span></td>
+        <td>Regulatory rule code (e.g. <code>SEC-MKT-01</code>)</td>
+      </tr>
+      <tr>
+        <td><span class="col-name">matched_rule_title</span></td>
+        <td class="type-tag">VARCHAR(255)</td>
+        <td><span class="badge badge-opt">OPT</span></td>
+        <td>Rule title / header</td>
+      </tr>
+      <tr>
+        <td><span class="col-name">matched_rule_text</span></td>
+        <td class="type-tag">TEXT</td>
+        <td><span class="badge badge-opt">OPT</span></td>
+        <td>Full statutory requirement text</td>
+      </tr>
+      <tr>
+        <td><span class="col-name">explanation</span></td>
+        <td class="type-tag">TEXT</td>
+        <td><span class="badge badge-nn">NN</span></td>
+        <td>Detailed explanation why passage is non-compliant</td>
+      </tr>
+      <tr>
+        <td><span class="col-name">severity</span></td>
+        <td class="type-tag">Enum(FlagSeverity)</td>
+        <td><span class="badge badge-nn">NN</span> (Default: <code>medium</code>)</td>
+        <td><code>critical</code>, <code>high</code>, <code>medium</code>, <code>low</code></td>
+      </tr>
+      <tr>
+        <td><span class="col-name">suggested_fix</span></td>
+        <td class="type-tag">TEXT</td>
+        <td><span class="badge badge-opt">OPT</span></td>
+        <td>Remediation recommendation / replacement phrasing</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- PAGE 4: AUDIT, NOTIFICATIONS & PII VAULT -->
+<div class="page-break"></div>
+
+<h1>4. Audit Trail, Notifications & PII Vault</h1>
+
+<!-- TABLE 6: AUDIT EVENTS -->
+<div class="no-break">
+  <div class="table-header-bar">
+    <div class="table-header-title">6. audit_events</div>
+    <div class="table-header-desc">Immutable regulatory ledger tracking all interactions and state changes</div>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 20%;">Column</th>
+        <th style="width: 20%;">Type</th>
+        <th style="width: 22%;">Modifiers</th>
+        <th style="width: 38%;">Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="col-name">id</span></td>
+        <td class="type-tag">VARCHAR(36)</td>
+        <td><span class="badge badge-pk">PK</span> <span class="badge badge-nn">NN</span></td>
+        <td>UUIDv4 audit event primary key</td>
+      </tr>
+      <tr>
+        <td><span class="col-name">document_id</span></td>
+        <td class="type-tag">VARCHAR(36)</td>
+        <td><span class="badge badge-fk">FK documents.id</span> <span class="badge badge-idx">IDX</span> <span class="badge badge-nn">NN</span></td>
+        <td>Document subject of the action</td>
+      </tr>
+      <tr>
+        <td><span class="col-name">actor_id</span></td>
+        <td class="type-tag">VARCHAR(36)</td>
+        <td><span class="badge badge-fk">FK users.id</span> <span class="badge badge-idx">IDX</span> <span class="badge badge-opt">OPT</span></td>
+        <td>User ID who triggered event (NULL for system)</td>
+      </tr>
+      <tr>
+        <td><span class="col-name">actor_name</span></td>
+        <td class="type-tag">VARCHAR(255)</td>
+        <td><span class="badge badge-opt">OPT</span></td>
+        <td>Actor display name snapshot at time of event</td>
+      </tr>
+      <tr>
+        <td><span class="col-name">actor_role</span></td>
+        <td class="type-tag">Enum(UserRole)</td>
+        <td><span class="badge badge-opt">OPT</span></td>
+        <td>Actor role snapshot</td>
+      </tr>
+      <tr>
+        <td><span class="col-name">action</span></td>
+        <td class="type-tag">Enum(AuditAction)</td>
+        <td><span class="badge badge-nn">NN</span></td>
+        <td>Action type: <code>submitted</code>, <code>viewed</code>, <code>decided</code>, etc.</td>
+      </tr>
+      <tr>
+        <td><span class="col-name">details_json</span></td>
+        <td class="type-tag">TEXT</td>
+        <td><span class="badge badge-opt">OPT</span></td>
+        <td>JSON encoded event metadata / payload diff</td>
+      </tr>
+      <tr>
+        <td><span class="col-name">created_at</span></td>
+        <td class="type-tag">DATETIME</td>
+        <td><span class="badge badge-idx">IDX</span> <span class="badge badge-nn">NN</span></td>
+        <td>Immutable timestamp (UTC)</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- TABLE 7: NOTIFICATIONS -->
+<div class="no-break">
+  <div class="table-header-bar">
+    <div class="table-header-title">7. notifications</div>
+    <div class="table-header-desc">In-app notifications for review alerts, revisions, and status updates</div>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 20%;">Column</th>
+        <th style="width: 20%;">Type</th>
+        <th style="width: 22%;">Modifiers</th>
+        <th style="width: 38%;">Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="col-name">id</span></td>
+        <td class="type-tag">VARCHAR(36)</td>
+        <td><span class="badge badge-pk">PK</span> <span class="badge badge-nn">NN</span></td>
+        <td>UUIDv4 notification ID</td>
+      </tr>
+      <tr>
+        <td><span class="col-name">user_id</span></td>
+        <td class="type-tag">VARCHAR(36)</td>
+        <td><span class="badge badge-fk">FK users.id</span> <span class="badge badge-idx">IDX</span> <span class="badge badge-nn">NN</span></td>
+        <td>Recipient user account ID</td>
+      </tr>
+      <tr>
+        <td><span class="col-name">document_id</span></td>
+        <td class="type-tag">VARCHAR(36)</td>
+        <td><span class="badge badge-fk">FK documents.id</span> <span class="badge badge-idx">IDX</span> <span class="badge badge-opt">OPT</span></td>
+        <td>Linked document ID (if applicable)</td>
+      </tr>
+      <tr>
+        <td><span class="col-name">title</span></td>
+        <td class="type-tag">VARCHAR(255)</td>
+        <td><span class="badge badge-nn">NN</span></td>
+        <td>Notification header / title</td>
+      </tr>
+      <tr>
+        <td><span class="col-name">message</span></td>
+        <td class="type-tag">TEXT</td>
+        <td><span class="badge badge-nn">NN</span></td>
+        <td>Detailed notification message text</td>
+      </tr>
+      <tr>
+        <td><span class="col-name">is_read</span></td>
+        <td class="type-tag">BOOLEAN</td>
+        <td><span class="badge badge-nn">NN</span> (Default: <code>false</code>)</td>
+        <td>Unread / read acknowledgment status</td>
+      </tr>
+      <tr>
+        <td><span class="col-name">created_at</span></td>
+        <td class="type-tag">DATETIME</td>
+        <td><span class="badge badge-idx">IDX</span> <span class="badge badge-nn">NN</span></td>
+        <td>Notification trigger timestamp</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- TABLE 8: PII MAPPINGS -->
+<div class="no-break">
+  <div class="table-header-bar">
+    <div class="table-header-title">8. pii_mappings</div>
+    <div class="table-header-desc">PII de-identification vault mapping tokens to real sensitive strings</div>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 20%;">Column</th>
+        <th style="width: 20%;">Type</th>
+        <th style="width: 22%;">Modifiers</th>
+        <th style="width: 38%;">Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="col-name">id</span></td>
+        <td class="type-tag">VARCHAR(36)</td>
+        <td><span class="badge badge-pk">PK</span> <span class="badge badge-nn">NN</span></td>
+        <td>UUIDv4 mapping primary key</td>
+      </tr>
+      <tr>
+        <td><span class="col-name">document_id</span></td>
+        <td class="type-tag">VARCHAR(36)</td>
+        <td><span class="badge badge-fk">FK documents.id</span> <span class="badge badge-idx">IDX</span> <span class="badge badge-nn">NN</span></td>
+        <td>Document containing the redacted PII</td>
+      </tr>
+      <tr>
+        <td><span class="col-name">placeholder</span></td>
+        <td class="type-tag">VARCHAR(100)</td>
+        <td><span class="badge badge-nn">NN</span></td>
+        <td>De-identified placeholder token (e.g. <code>[CLIENT_1]</code>)</td>
+      </tr>
+      <tr>
+        <td><span class="col-name">original_value</span></td>
+        <td class="type-tag">TEXT</td>
+        <td><span class="badge badge-nn">NN</span></td>
+        <td>Original sensitive raw string (e.g. <code>John Doe</code>)</td>
+      </tr>
+      <tr>
+        <td><span class="col-name">entity_type</span></td>
+        <td class="type-tag">VARCHAR(50)</td>
+        <td><span class="badge badge-nn">NN</span></td>
+        <td>Entity type: <code>name</code>, <code>email</code>, <code>ssn</code>, <code>amount</code></td>
+      </tr>
+      <tr>
+        <td><span class="col-name">created_at</span></td>
+        <td class="type-tag">DATETIME</td>
+        <td><span class="badge badge-nn">NN</span></td>
+        <td>De-identification timestamp</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- PAGE 5: RAG & VECTOR CORPUS & INTEGRITY MATRIX -->
+<div class="page-break"></div>
+
+<h1>5. Vector & RAG Corpus & Cascades</h1>
+
+<!-- TABLE 9: COMPLIANCE RULES -->
+<div class="no-break">
+  <div class="table-header-bar">
+    <div class="table-header-title">9. compliance_rules</div>
+    <div class="table-header-desc">SEC/FINRA regulatory rules and disclosure standards with vector embeddings</div>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 20%;">Column</th>
+        <th style="width: 20%;">Type</th>
+        <th style="width: 22%;">Modifiers</th>
+        <th style="width: 38%;">Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="col-name">id</span></td>
+        <td class="type-tag">VARCHAR(36)</td>
+        <td><span class="badge badge-pk">PK</span> <span class="badge badge-nn">NN</span></td>
+        <td>UUIDv4 rule primary key</td>
+      </tr>
+      <tr>
+        <td><span class="col-name">rule_code</span></td>
+        <td class="type-tag">VARCHAR(50)</td>
+        <td><span class="badge badge-uq">UQ</span> <span class="badge badge-idx">IDX</span> <span class="badge badge-nn">NN</span></td>
+        <td>Unique statutory code (e.g. <code>SEC-MKT-01</code>)</td>
+      </tr>
+      <tr>
+        <td><span class="col-name">category</span></td>
+        <td class="type-tag">Enum(RuleCategory)</td>
+        <td><span class="badge badge-idx">IDX</span> <span class="badge badge-nn">NN</span></td>
+        <td>Taxonomy: <code>required_disclosure</code>, <code>prohibited_claims</code></td>
+      </tr>
+      <tr>
+        <td><span class="col-name">title</span></td>
+        <td class="type-tag">VARCHAR(255)</td>
+        <td><span class="badge badge-nn">NN</span></td>
+        <td>Regulatory rule title</td>
+      </tr>
+      <tr>
+        <td><span class="col-name">description</span></td>
+        <td class="type-tag">TEXT</td>
+        <td><span class="badge badge-nn">NN</span></td>
+        <td>Short purpose and scope summary</td>
+      </tr>
+      <tr>
+        <td><span class="col-name">rule_text</span></td>
+        <td class="type-tag">TEXT</td>
+        <td><span class="badge badge-nn">NN</span></td>
+        <td>Full statutory regulatory requirement</td>
+      </tr>
+      <tr>
+        <td><span class="col-name">standard_disclosure</span></td>
+        <td class="type-tag">TEXT</td>
+        <td><span class="badge badge-opt">OPT</span></td>
+        <td>Mandatory boilerplate text required</td>
+      </tr>
+      <tr>
+        <td><span class="col-name">embedding_json</span></td>
+        <td class="type-tag">TEXT</td>
+        <td><span class="badge badge-opt">OPT</span></td>
+        <td>Vector embedding (JSON float array) for RAG matching</td>
+      </tr>
+      <tr>
+        <td><span class="col-name">created_at</span></td>
+        <td class="type-tag">DATETIME</td>
+        <td><span class="badge badge-nn">NN</span></td>
+        <td>Rule insertion timestamp</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- TABLE 10: PRECEDENT SUBMISSIONS -->
+<div class="no-break">
+  <div class="table-header-bar">
+    <div class="table-header-title">10. precedent_submissions</div>
+    <div class="table-header-desc">Historical approved/rejected precedents for few-shot RAG context</div>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 20%;">Column</th>
+        <th style="width: 20%;">Type</th>
+        <th style="width: 22%;">Modifiers</th>
+        <th style="width: 38%;">Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="col-name">id</span></td>
+        <td class="type-tag">VARCHAR(36)</td>
+        <td><span class="badge badge-pk">PK</span> <span class="badge badge-nn">NN</span></td>
+        <td>UUIDv4 precedent primary key</td>
+      </tr>
+      <tr>
+        <td><span class="col-name">title</span></td>
+        <td class="type-tag">VARCHAR(255)</td>
+        <td><span class="badge badge-nn">NN</span></td>
+        <td>Precedent document title</td>
+      </tr>
+      <tr>
+        <td><span class="col-name">document_type</span></td>
+        <td class="type-tag">Enum(DocumentType)</td>
+        <td><span class="badge badge-nn">NN</span> (Default: <code>other</code>)</td>
+        <td>Classification type</td>
+      </tr>
+      <tr>
+        <td><span class="col-name">masked_text</span></td>
+        <td class="type-tag">TEXT</td>
+        <td><span class="badge badge-nn">NN</span></td>
+        <td>De-identified excerpt / document text</td>
+      </tr>
+      <tr>
+        <td><span class="col-name">decision</span></td>
+        <td class="type-tag">Enum(DocumentStatus)</td>
+        <td><span class="badge badge-nn">NN</span></td>
+        <td>Historic review verdict</td>
+      </tr>
+      <tr>
+        <td><span class="col-name">officer_comment</span></td>
+        <td class="type-tag">TEXT</td>
+        <td><span class="badge badge-nn">NN</span></td>
+        <td>Officer reasoning and historical notes</td>
+      </tr>
+      <tr>
+        <td><span class="col-name">source_document_id</span></td>
+        <td class="type-tag">VARCHAR(36)</td>
+        <td><span class="badge badge-opt">OPT</span></td>
+        <td>Original source document UUID (if converted)</td>
+      </tr>
+      <tr>
+        <td><span class="col-name">embedding_json</span></td>
+        <td class="type-tag">TEXT</td>
+        <td><span class="badge badge-opt">OPT</span></td>
+        <td>Vector embedding (JSON float array) for few-shot RAG</td>
+      </tr>
+      <tr>
+        <td><span class="col-name">created_at</span></td>
+        <td class="type-tag">DATETIME</td>
+        <td><span class="badge badge-nn">NN</span></td>
+        <td>Precedent record timestamp</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<h2>6. Referential Integrity & Cascade Matrix</h2>
+<div class="no-break">
+  <table>
+    <thead>
+      <tr>
+        <th>Parent Entity</th>
+        <th>Child Entity</th>
+        <th>Foreign Key Column</th>
+        <th>On Delete Behavior</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>users</code></td>
+        <td><code>documents</code></td>
+        <td><code>documents.advisor_id</code></td>
+        <td>Restricted (Preserves submission history)</td>
+      </tr>
+      <tr>
+        <td><code>users</code></td>
+        <td><code>review_decisions</code></td>
+        <td><code>review_decisions.officer_id</code></td>
+        <td>Restricted (Preserves audit verdict history)</td>
+      </tr>
+      <tr>
+        <td><code>users</code></td>
+        <td><code>notifications</code></td>
+        <td><code>notifications.user_id</code></td>
+        <td>Cascade Delete (<code>all, delete-orphan</code>)</td>
+      </tr>
+      <tr>
+        <td><code>documents</code></td>
+        <td><code>documents</code></td>
+        <td><code>documents.parent_document_id</code></td>
+        <td>Self-referencing tree (Set NULL / hierarchy)</td>
+      </tr>
+      <tr>
+        <td><code>documents</code></td>
+        <td><code>ai_analyses</code></td>
+        <td><code>ai_analyses.document_id</code></td>
+        <td>Cascade Delete (<code>all, delete-orphan</code>)</td>
+      </tr>
+      <tr>
+        <td><code>documents</code></td>
+        <td><code>review_decisions</code></td>
+        <td><code>review_decisions.document_id</code></td>
+        <td>Cascade Delete (<code>all, delete-orphan</code>)</td>
+      </tr>
+      <tr>
+        <td><code>documents</code></td>
+        <td><code>audit_events</code></td>
+        <td><code>audit_events.document_id</code></td>
+        <td>Cascade Delete (<code>all, delete-orphan</code>)</td>
+      </tr>
+      <tr>
+        <td><code>documents</code></td>
+        <td><code>pii_mappings</code></td>
+        <td><code>pii_mappings.document_id</code></td>
+        <td>Cascade Delete (<code>all, delete-orphan</code>)</td>
+      </tr>
+      <tr>
+        <td><code>ai_analyses</code></td>
+        <td><code>compliance_flags</code></td>
+        <td><code>compliance_flags.analysis_id</code></td>
+        <td>Cascade Delete (<code>all, delete-orphan</code>)</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+</body>
+</html>

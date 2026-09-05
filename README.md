@@ -15,26 +15,26 @@ This system bridges the gap between **Financial Advisors** (who need rapid turna
 
 ## 📑 Table of Contents
 
-- [The Problem \& Why We Built This](#-the-problem--why-we-built-this)
-- [System Architecture \& Data Flow](#-system-architecture--data-flow)
-- [Core Highlights \& Guarantees](#-core-highlights--guarantees)
+- [The Problem & Why We Built This](#-the-problem--why-we-built-this)
+- [System Architecture & Data Flow](#-system-architecture--data-flow)
+- [Core Highlights & Guarantees](#-core-highlights--guarantees)
   - [1. Deterministic Server-Side PII Masking](#1-deterministic-server-side-pii-masking)
   - [2. Strict Role Boundaries (RBAC)](#2-strict-role-boundaries-rbac)
   - [3. Triple-Engine Vector Intelligence](#3-triple-engine-vector-intelligence)
   - [4. AI Compliance Assist with Graceful Fallback](#4-ai-compliance-assist-with-graceful-fallback)
   - [5. Document Revision Threading](#5-document-revision-threading)
-  - [6. Immutable Audit Trail \& In-App Alerts](#6-immutable-audit-trail--in-app-alerts)
+  - [6. Immutable Audit Trail & In-App Alerts](#6-immutable-audit-trail--in-app-alerts)
 - [Quickstart Guide](#-quickstart-guide)
   - [Prerequisites](#prerequisites)
-  - [1. Clone \& Setup Environment](#1-clone--setup-environment)
+  - [1. Clone & Setup Environment](#1-clone--setup-environment)
   - [2. Configure Settings (.env)](#2-configure-settings-env)
-  - [3. Initialize \& Seed Database](#3-initialize--seed-database)
+  - [3. Initialize & Seed Database](#3-initialize--seed-database)
   - [4. Launch the Server](#4-launch-the-server)
 - [Interactive API Walkthrough (Step-by-Step curl Guide)](#-interactive-api-walkthrough-step-by-step-curl-guide)
 - [API Reference Matrix](#-api-reference-matrix)
 - [Project Directory Structure](#-project-directory-structure)
 - [Running Automated Tests](#-running-automated-tests)
-- [Configuration \& Production Hardening](#-configuration--production-hardening)
+- [Configuration & Production Hardening](#-configuration--production-hardening)
 - [Frequently Asked Questions (FAQ)](#-frequently-asked-questions-faq)
 
 ---
@@ -139,7 +139,7 @@ When a document is analyzed, the backend triggers three distinct vector search j
 
 1. **Regulatory Rule Matching**: Chunks the document and retrieves the most relevant SEC / FINRA compliance rules from the pre-seeded regulatory corpus.
 2. **Missing-Disclosure Detection by Absence**: Evaluates document similarity against mandatory required disclosures (e.g., *Past Performance Disclaimer*, *Not FDIC Insured Notice*, *Tax Advice Disclaimer*). If semantic similarity across all chunks falls below `DISCLOSURE_ABSENCE_THRESHOLD = 0.60`, a missing disclosure flag is automatically raised.
-3. **Precedent Retrieval**: Queries 100+ historical compliance cases to surface the **Top 3 most similar past submissions**, showing how past officers ruled and why.
+3. **Precedent Retrieval**: Queries historical compliance cases to surface the **Top 3 most similar past submissions**, showing how past officers ruled and why.
 
 ---
 
@@ -147,7 +147,7 @@ When a document is analyzed, the backend triggers three distinct vector search j
 - **Structured Findings**: Generates an executive summary and pinpointed flags containing:
   - Exact document passage excerpt
   - Matched regulatory rule ID
-  - Severity level (`high`, `medium`, `low`, `info`)
+  - Severity level (`critical`, `high`, `medium`, `low`)
   - Clear explanation of the violation
   - Concrete suggested remediation
 - **Graceful Fallback Mode**: If the Google Gemini API key is not supplied, rate-limited, or network-blocked, the system automatically falls back to an internal heuristic and vector-backed analysis engine (`status: "degraded"`). **The compliance review pipeline never grinds to a halt.**
@@ -245,20 +245,17 @@ PRECEDENT_TOP_K=3
 RULE_RETRIEVAL_TOP_K=5
 ```
 
-> 💡 **No API Key? No Problem!** If you do not have a Gemini API key, the system functions seamlessly using local TF-IDF and heuristic compliance rules.
+> 💡 **No API Key? No Problem!** If you do not have a Gemini API key, the system functions seamlessly using local vector and heuristic compliance rules.
 
 ---
 
 ### 3. Initialize & Seed Database
 
-Run the seed scripts to populate 25+ regulatory rules, 100+ historical precedents, default test accounts, and realistic sample documents:
+Run the seeder script to populate 25+ regulatory rules, historical precedents, default test accounts, and vector embeddings:
 
 ```bash
-# Seed rules, precedents, and default accounts
+# Seed rules, precedents, vector embeddings, and default accounts
 python scripts/seed_corpus.py
-
-# Generate sample PDF, DOCX, and XLSX files in sample_test_files/
-python scripts/generate_sample_files.py
 ```
 
 #### Pre-Configured Demo Accounts:
@@ -303,7 +300,7 @@ curl -X POST http://localhost:8000/api/v1/documents/upload \
   -H "Authorization: Bearer <ADVISOR_TOKEN>" \
   -F "file=@sample_test_files/sample_compliant_proposal.docx" \
   -F "title=Henderson Retirement Strategy 2024" \
-  -F "document_type=marketing_presentation"
+  -F "document_type=proposal_letter"
 ```
 *Response returns document ID (e.g. `doc_123`), version 1, and `pending_review` status.*
 
@@ -407,11 +404,11 @@ curl -X GET "http://localhost:8000/api/v1/documents/<DOC_ID>/audit?thread=true" 
 ## 📂 Project Directory Structure
 
 ```text
+├── .gitignore                      # Git ignore rules for secrets, DBs, and temp files
 ├── .env.example                    # Template environment configuration
-├── .env                            # Local environment configuration
+├── .env                            # Local environment configuration (git-ignored)
 ├── requirements.txt                # Python package dependencies
 ├── README.md                       # Comprehensive documentation & guide
-├── compliance_app.db               # SQLite database (auto-created)
 ├── app/
 │   ├── main.py                     # FastAPI app factory, CORS, and startup hooks
 │   ├── api/
@@ -429,7 +426,7 @@ curl -X GET "http://localhost:8000/api/v1/documents/<DOC_ID>/audit?thread=true" 
 │   │   ├── database.py             # SQLAlchemy session and engine management
 │   │   └── security.py             # Password hashing (bcrypt) & JWT tokens
 │   ├── models/                     # SQLAlchemy ORM database models
-│   │   ├── base.py                 # Enums: DocumentStatus, UserRole, RuleCategory
+│   │   ├── base.py                 # Enums: DocumentStatus, UserRole, RuleCategory, etc.
 │   │   ├── user.py                 # User model
 │   │   ├── document.py             # Document model (with versioning & thread links)
 │   │   ├── review.py               # ReviewDecision model
@@ -445,7 +442,7 @@ curl -X GET "http://localhost:8000/api/v1/documents/<DOC_ID>/audit?thread=true" 
 │   │   ├── ai_analysis.py
 │   │   ├── audit.py
 │   │   ├── notification.py
-│   │   └── vector_corpus.py
+│   │   └── vector.py
 │   └── services/                   # Core business logic services
 │       ├── extractor.py            # Multi-format parser (pypdf, docx, openpyxl)
 │       ├── pii_masker.py           # Deterministic PII detection & masking engine
@@ -455,18 +452,19 @@ curl -X GET "http://localhost:8000/api/v1/documents/<DOC_ID>/audit?thread=true" 
 │       ├── audit_service.py        # Append-only audit logger
 │       └── notification_service.py # In-app notification dispatcher
 ├── scripts/
-│   ├── seed_corpus.py              # Seeds 25+ rules, 100+ precedents, demo accounts
-│   └── generate_sample_files.py    # Generates test PDF, DOCX, and XLSX files
-├── sample_test_files/              # Generated test files for quick testing
-└── tests/                          # 16-suite automated Pytest test suite
-    ├── conftest.py
-    ├── test_auth_and_roles.py
-    ├── test_pii_masker.py
-    ├── test_state_machine.py
-    ├── test_vector_retrieval.py
-    ├── test_audit_and_notifications.py
-    ├── test_graceful_degradation.py
-    └── test_extended_coverage.py
+│   └── seed_corpus.py              # Seeds 25+ rules, precedents, embeddings & demo accounts
+├── sample_test_files/              # Sample documents for manual testing & demos
+├── tests/                          # 16-suite automated Pytest test suite
+│   ├── conftest.py
+│   ├── test_auth_and_roles.py
+│   ├── test_pii_masker.py
+│   ├── test_state_machine.py
+│   ├── test_vector_retrieval.py
+│   ├── test_audit_and_notifications.py
+│   ├── test_graceful_degradation.py
+│   └── test_extended_coverage.py
+└── uploads/                        # Upload destination folder
+    └── .gitkeep                    # Keeps empty folder structure in Git
 ```
 
 ---
