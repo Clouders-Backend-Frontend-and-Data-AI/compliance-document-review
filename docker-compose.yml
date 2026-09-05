@@ -1,0 +1,68 @@
+services:
+
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: compliance-postgres
+    restart: unless-stopped
+
+    environment:
+      POSTGRES_DB: compliance_db
+      POSTGRES_USER: compliance_user
+      POSTGRES_PASSWORD: change-me-local-only
+
+    ports:
+      - "5432:5432"
+
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U compliance_user -d compliance_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+    container_name: compliance-backend
+    restart: unless-stopped
+
+    environment:
+      PROJECT_NAME: "Compliance Document Review API"
+      API_V1_STR: "/api/v1"
+
+      SECRET_KEY: "CHANGE-ME-LOCAL-ONLY"
+      ALGORITHM: "HS256"
+      ACCESS_TOKEN_EXPIRE_MINUTES: "1440"
+
+      DATABASE_URL: "postgresql+psycopg://compliance_user:change-me-local-only@postgres:5432/compliance_db"
+
+      UPLOAD_DIR: "/app/uploads"
+      MAX_UPLOAD_SIZE_MB: "10"
+
+      GEMINI_API_KEY: ""
+      GEMINI_MODEL: "gemini-1.5-flash"
+      AI_TIMEOUT_SECONDS: "30"
+
+      DISCLOSURE_ABSENCE_THRESHOLD: "0.60"
+      PRECEDENT_TOP_K: "3"
+      RULE_RETRIEVAL_TOP_K: "5"
+
+      BACKEND_CORS_ORIGINS: '["*"]'
+
+    ports:
+      - "8000:8000"
+
+    volumes:
+      - uploads_data:/app/uploads
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+  uploads_data:
