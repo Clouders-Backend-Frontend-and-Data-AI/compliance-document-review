@@ -50,3 +50,8 @@ uploads/*
 .idea/
 *.swp
 *.swo
+
+# Temporary backup files
+*.backup
+test-compliance-document.*
+openapi.json
