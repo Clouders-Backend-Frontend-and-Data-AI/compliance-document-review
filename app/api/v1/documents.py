@@ -80,7 +80,7 @@ def get_document_thread(
         document_id=document_id,
         user=current_user
     )
-    current_v = next((d.version_number for d in thread_docs if d.id == document_id), 1)
+    current_v = max((d.version_number for d in thread_docs), default=1)
     return {
         "thread_id": thread_id,
         "total_versions": len(thread_docs),
