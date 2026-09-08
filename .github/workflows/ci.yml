@@ -34,9 +34,9 @@ jobs:
           --health-retries 5
 
     env:
-      DATABASE_URL: postgresql+psycopg://compliance_user:ci-test-password@localhost:5432/compliance_db
-      SECRET_KEY: ci-test-secret-key
-      UPLOAD_DIR: ${{ github.workspace }}/uploads
+  DATABASE_URL: ${{ secrets.CI_DATABASE_URL }}
+  SECRET_KEY: ${{ secrets.CI_SECRET_KEY }}
+  UPLOAD_DIR: ${{ github.workspace }}/uploads
       PYTHONPATH: .
 
     steps:
