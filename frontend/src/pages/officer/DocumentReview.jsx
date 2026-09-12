@@ -6,6 +6,7 @@ import StatusPill from "../../components/StatusPill";
 import AssistPanel from "../../components/AssistPanel";
 import AuditTrail from "../../components/AuditTrail";
 import DocumentPreview from "../../components/DocumentPreview";
+import { getErrorMessage } from "../../api/errorMessage";
 
 const DECISIONS = [
   { value: "approved", label: "Approve" },
@@ -34,7 +35,7 @@ export default function DocumentReview() {
       navigate("/officer");
     },
     onError: (err) => {
-      setError(err.response?.data?.detail || "Couldn't record the decision. Try again.");
+      setError(getErrorMessage(err, "Couldn't record the decision. Try again."));
     },
   });
 

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/useAuth";
+import { getErrorMessage } from "../api/errorMessage";
 
 export default function Signup() {
   const navigate = useNavigate();
@@ -21,7 +22,7 @@ export default function Signup() {
       await signup(form);
       navigate(form.role === "officer" ? "/officer" : "/advisor");
     } catch (err) {
-      setError(err.response?.data?.detail || "Couldn't create the account.");
+      setError(getErrorMessage(err, "Couldn't create the account."));
     } finally {
       setLoading(false);
     }

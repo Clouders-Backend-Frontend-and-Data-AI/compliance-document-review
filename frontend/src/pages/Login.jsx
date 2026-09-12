@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/useAuth";
+import { getErrorMessage } from "../api/errorMessage";
 
 export default function Login() {
   const navigate = useNavigate();
@@ -18,9 +19,7 @@ export default function Login() {
       const user = await login(email, password);
       navigate(user.role === "officer" ? "/officer" : "/advisor");
     } catch (err) {
-      setError(
-        err.response?.data?.detail || "Couldn't sign in. Check your email and password."
-      );
+      setError(getErrorMessage(err, "Couldn't sign in. Check your email and password."));
     } finally {
       setLoading(false);
     }
