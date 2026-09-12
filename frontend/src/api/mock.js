@@ -422,6 +422,36 @@ export const mockApi = {
 
   async getPrecedents() {
     await wait();
-    return [];
+    // Mirrors PrecedentOut from /corpus/precedents — full masked_text, and a
+    // source_document_id only where the precedent actually traces back to a
+    // real reviewed document (most seeded precedents won't have one).
+    return [
+      {
+        id: "p1",
+        title: "Retirement Rebalancing Letter — March",
+        document_type: "proposal_letter",
+        masked_text:
+          "Dear [CLIENT_1], following our quarterly review of [ACCOUNT_1], we recommend " +
+          "rebalancing toward fixed income given your stated retirement horizon. This " +
+          "recommendation is suitable given your risk tolerance and investment objectives " +
+          "as documented in your account file. Past performance is not indicative of future results.",
+        decision: "approved",
+        officer_comment: "Suitability disclosure present, cleared.",
+        source_document_id: null,
+        created_at: "2026-03-14T10:00:00Z",
+      },
+      {
+        id: "p4",
+        title: "Spring Market Update Email",
+        document_type: "marketing_email",
+        masked_text:
+          "Markets are poised for exceptional gains this quarter based on our analysis. " +
+          "Don't miss this opportunity — act now to maximize your returns.",
+        decision: "rejected",
+        officer_comment: "Guaranteed-return language, rejected outright.",
+        source_document_id: "3",
+        created_at: "2026-04-02T09:00:00Z",
+      },
+    ];
   },
 };
