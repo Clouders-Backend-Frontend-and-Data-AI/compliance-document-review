@@ -10,6 +10,7 @@ import {
 import StatusPill from "../../components/StatusPill";
 import AuditTrail from "../../components/AuditTrail";
 import DocumentPreview from "../../components/DocumentPreview";
+import { getErrorMessage } from "../../api/errorMessage";
 
 export default function DocumentDetail() {
   const { id } = useParams();
@@ -42,7 +43,7 @@ export default function DocumentDetail() {
       queryClient.invalidateQueries({ queryKey: ["documents", "mine"] });
       navigate(`/advisor/documents/${result.document.id}`);
     },
-    onError: (err) => setError(err.response?.data?.detail || "Couldn't submit the revision."),
+    onError: (err) => setError(getErrorMessage(err, "Couldn't submit the revision.")),
   });
 
   function handleRevise(e) {

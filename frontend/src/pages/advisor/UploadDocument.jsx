@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { uploadDocument } from "../../api/client";
+import { getErrorMessage } from "../../api/errorMessage";
 
 const MAX_SIZE_MB = 10;
 const ACCEPTED = [".pdf", ".docx", ".xlsx"];
@@ -54,7 +55,7 @@ export default function UploadDocument() {
       const result = await uploadDocument(formData);
       navigate(`/advisor/documents/${result.document.id}`);
     } catch (err) {
-      setError(err.response?.data?.detail || "Upload failed. Try again.");
+      setError(getErrorMessage(err, "Upload failed. Try again."));
     } finally {
       setSubmitting(false);
     }
