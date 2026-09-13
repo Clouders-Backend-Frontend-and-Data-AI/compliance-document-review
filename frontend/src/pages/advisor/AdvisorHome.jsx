@@ -1,15 +1,22 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { listDocuments } from "../../api/client";
 import StatusPill from "../../components/StatusPill";
 
 export default function AdvisorHome() {
+  const [search, setSearch] = useState("");
+
   const { data, isLoading, isError } = useQuery({
     queryKey: ["documents", "mine"],
     queryFn: () => listDocuments(),
   });
 
-  const documents = data || [];
+  const allDocuments = data || [];
+  const query = search.trim().toLowerCase();
+  const documents = query
+    ? allDocuments.filter((doc) => (doc.title || "").toLowerCase().includes(query))
+    : allDocuments;
 
   return (
     <div>
@@ -31,7 +38,7 @@ export default function AdvisorHome() {
         </p>
       )}
 
-      {!isLoading && !isError && documents.length === 0 && (
+      {!isLoading && !isError && allDocuments.length === 0 && (
         <div className="border border-hairline bg-white px-6 py-10 text-center">
           <p className="text-ink mb-1">No submissions yet</p>
           <p className="text-sm text-slate mb-4">
@@ -40,6 +47,24 @@ export default function AdvisorHome() {
           <Link to="/advisor/upload" className="text-signal underline underline-offset-2 text-sm">
             Submit your first document
           </Link>
+        </div>
+      )}
+
+      {!isLoading && !isError && allDocuments.length > 0 && (
+        <div className="flex justify-end mb-3">
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search by title…"
+            className="w-56 border border-hairline px-3 py-1.5 text-sm bg-white focus:outline-none focus:border-signal"
+          />
+        </div>
+      )}
+
+      {allDocuments.length > 0 && documents.length === 0 && (
+        <div className="border border-hairline bg-white px-6 py-10 text-center">
+          <p className="text-sm text-slate">No submissions match "{search}".</p>
         </div>
       )}
 

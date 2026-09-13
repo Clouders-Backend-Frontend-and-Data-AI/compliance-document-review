@@ -14,32 +14,47 @@ const FILTERS = [
 
 export default function OfficerQueue() {
   const [status, setStatus] = useState("");
+  const [search, setSearch] = useState("");
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ["documents", "queue", status],
     queryFn: () => listDocuments(status ? { status } : undefined),
   });
 
-  const documents = data || [];
+  const allDocuments = data || [];
+  const query = search.trim().toLowerCase();
+  const documents = query
+    ? allDocuments.filter((doc) => (doc.title || "").toLowerCase().includes(query))
+    : allDocuments;
 
   return (
     <div>
       <h1 className="text-2xl mb-6">Review queue</h1>
 
-      <div className="flex gap-2 mb-5">
-        {FILTERS.map((f) => (
-          <button
-            key={f.value}
-            onClick={() => setStatus(f.value)}
-            className={`text-sm px-3 py-1.5 border ${
-              status === f.value
-                ? "border-signal text-signal bg-white"
-                : "border-hairline text-slate"
-            }`}
-          >
-            {f.label}
-          </button>
-        ))}
+      <div className="flex items-center justify-between gap-4 mb-5">
+        <div className="flex gap-2">
+          {FILTERS.map((f) => (
+            <button
+              key={f.value}
+              onClick={() => setStatus(f.value)}
+              className={`text-sm px-3 py-1.5 border ${
+                status === f.value
+                  ? "border-signal text-signal bg-white"
+                  : "border-hairline text-slate"
+              }`}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+
+        <input
+          type="text"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search by title…"
+          className="w-56 border border-hairline px-3 py-1.5 text-sm bg-white focus:outline-none focus:border-signal"
+        />
       </div>
 
       {isLoading && <p className="text-sm text-slate">Loading the queue…</p>}
@@ -52,7 +67,11 @@ export default function OfficerQueue() {
       {!isLoading && !isError && documents.length === 0 && (
         <div className="border border-hairline bg-white px-6 py-10 text-center">
           <p className="text-ink mb-1">Nothing here</p>
-          <p className="text-sm text-slate">No documents match this filter right now.</p>
+          <p className="text-sm text-slate">
+            {query
+              ? `No documents match "${search}".`
+              : "No documents match this filter right now."}
+          </p>
         </div>
       )}
 
