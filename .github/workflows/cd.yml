@@ -17,6 +17,24 @@ jobs:
     name: Build, Push and Deploy
     runs-on: ubuntu-latest
 
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+
+        env:
+          POSTGRES_DB: compliance_db
+          POSTGRES_USER: compliance_user
+          POSTGRES_PASSWORD: ci-test-password
+
+        ports:
+          - 5432:5432
+
+        options: >-
+          --health-cmd "pg_isready -U compliance_user -d compliance_db"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
