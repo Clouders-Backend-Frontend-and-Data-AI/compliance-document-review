@@ -14,21 +14,18 @@ env:
 
 jobs:
   deploy:
-    name: Production Deployment
+    name: Test and Deploy
     runs-on: ubuntu-latest
 
     services:
       postgres:
         image: pgvector/pgvector:pg16
-
         env:
           POSTGRES_DB: compliance_db
           POSTGRES_USER: compliance_user
           POSTGRES_PASSWORD: ci-test-password
-
         ports:
           - 5432:5432
-
         options: >-
           --health-cmd "pg_isready -U compliance_user -d compliance_db"
           --health-interval 10s
@@ -42,14 +39,15 @@ jobs:
       PYTHONPATH: .
 
     steps:
+
       # --------------------------------------------------
-      # 1. Checkout
+      # 1. Checkout repository
       # --------------------------------------------------
       - name: Checkout repository
         uses: actions/checkout@v4
 
       # --------------------------------------------------
-      # 2. Python
+      # 2. Setup Python
       # --------------------------------------------------
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -80,14 +78,15 @@ jobs:
           pytest -v
 
       # --------------------------------------------------
-      # 6. Build Docker image test
+      # 6. Build CI Docker image
       # --------------------------------------------------
       - name: Build Docker image
         run: |
           docker build -t compliance-backend:ci .
 
       # --------------------------------------------------
-      # 7. TEMPORARY: Debug GitHub OIDC claims
+      # 7. Debug GitHub OIDC claims
+      # Temporary verification step
       # --------------------------------------------------
       - name: Debug GitHub OIDC claims
         run: |
@@ -123,7 +122,7 @@ jobs:
           PY
 
       # --------------------------------------------------
-      # 8. Configure AWS credentials using GitHub OIDC
+      # 8. Configure AWS credentials using OIDC
       # --------------------------------------------------
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v5
@@ -139,38 +138,39 @@ jobs:
           aws sts get-caller-identity
 
       # --------------------------------------------------
-      # 10. Login to Amazon ECR
+      # 10. Authenticate Docker with ECR
       # --------------------------------------------------
-      - name: Login to Amazon ECR
-        id: ecr-login
+      - name: Authenticate Docker with ECR
+        id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
       # --------------------------------------------------
       # 11. Build production image
       # --------------------------------------------------
-      - name: Build production Docker image
-        env:
-          ECR_REGISTRY: ${{ steps.ecr-login.outputs.registry }}
-          IMAGE_TAG: ${{ github.sha }}
+      - name: Build production image
         run: |
+          ECR_REGISTRY="${{ steps.login-ecr.outputs.registry }}"
+
           docker build \
-            -t "$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" \
+            -t "$ECR_REGISTRY/$ECR_REPOSITORY:${{ github.sha }}" \
             -t "$ECR_REGISTRY/$ECR_REPOSITORY:latest" \
             .
 
       # --------------------------------------------------
-      # 12. Push production image
+      # 12. Push production images to ECR
       # --------------------------------------------------
-      - name: Push Docker image to ECR
-        env:
-          ECR_REGISTRY: ${{ steps.ecr-login.outputs.registry }}
-          IMAGE_TAG: ${{ github.sha }}
+      - name: Push production images
         run: |
-          docker push "$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
-          docker push "$ECR_REGISTRY/$ECR_REPOSITORY:latest"
+          ECR_REGISTRY="${{ steps.login-ecr.outputs.registry }}"
+
+          docker push \
+            "$ECR_REGISTRY/$ECR_REPOSITORY:${{ github.sha }}"
+
+          docker push \
+            "$ECR_REGISTRY/$ECR_REPOSITORY:latest"
 
       # --------------------------------------------------
-      # 13. Deploy to EC2 using AWS Systems Manager
+      # 13. Deploy to EC2 through SSM
       # --------------------------------------------------
       - name: Deploy to EC2
         id: deploy
@@ -178,13 +178,13 @@ jobs:
           COMMAND_ID=$(aws ssm send-command \
             --instance-ids "$EC2_INSTANCE_ID" \
             --document-name "AWS-RunShellScript" \
-            --comment "Deploy Compliance Document Review $GITHUB_SHA" \
+            --comment "Deploy Compliance Document Review ${{ github.sha }}" \
             --parameters 'commands=[
               "set -e",
               "echo \"Logging into Amazon ECR...\"",
               "aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 361103952701.dkr.ecr.us-east-1.amazonaws.com",
-              "echo \"Pulling image $GITHUB_SHA...\"",
-              "docker pull 361103952701.dkr.ecr.us-east-1.amazonaws.com/compliance-document-review:$GITHUB_SHA",
+              "echo \"Pulling image ${{ github.sha }}...\"",
+              "docker pull 361103952701.dkr.ecr.us-east-1.amazonaws.com/compliance-document-review:${{ github.sha }}",
               "echo \"Retrieving application secrets...\"",
               "SECRET_JSON=$(aws secretsmanager get-secret-value --secret-id compliance-document-review/production/app --query SecretString --output text --region us-east-1)",
               "export DATABASE_URL=$(echo \"$SECRET_JSON\" | python3 -c \"import sys,json; print(json.load(sys.stdin)[\\\"DATABASE_URL\\\"])\")",
@@ -195,7 +195,7 @@ jobs:
               "echo \"Removing previous backend container...\"",
               "docker rm -f compliance-backend >/dev/null 2>&1 || true",
               "echo \"Starting new backend container...\"",
-              "docker run -d --name compliance-backend --restart unless-stopped --network compliance-net -p 8000:8000 -e DATABASE_URL=\"$DATABASE_URL\" -e SECRET_KEY=\"$SECRET_KEY\" -e UPLOAD_DIR=/app/uploads -e PYTHONUNBUFFERED=1 361103952701.dkr.ecr.us-east-1.amazonaws.com/compliance-document-review:$GITHUB_SHA",
+              "docker run -d --name compliance-backend --restart unless-stopped --network compliance-net -p 8000:8000 -e DATABASE_URL=\"$DATABASE_URL\" -e SECRET_KEY=\"$SECRET_KEY\" -e UPLOAD_DIR=/app/uploads -e PYTHONUNBUFFERED=1 361103952701.dkr.ecr.us-east-1.amazonaws.com/compliance-document-review:${{ github.sha }}",
               "unset DATABASE_URL SECRET_KEY",
               "echo \"Waiting for application startup...\"",
               "sleep 10",
