@@ -40,113 +40,46 @@ jobs:
 
     steps:
 
-      # --------------------------------------------------
-      # 1. Checkout repository
-      # --------------------------------------------------
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # --------------------------------------------------
-      # 2. Setup Python
-      # --------------------------------------------------
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
           cache: "pip"
 
-      # --------------------------------------------------
-      # 3. Install dependencies
-      # --------------------------------------------------
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      # --------------------------------------------------
-      # 4. Create upload directory
-      # --------------------------------------------------
       - name: Create upload directory
         run: |
           mkdir -p "$UPLOAD_DIR"
 
-      # --------------------------------------------------
-      # 5. Run backend tests
-      # --------------------------------------------------
       - name: Run backend tests
         run: |
           pytest -v
 
-      # --------------------------------------------------
-      # 6. Build CI Docker image
-      # --------------------------------------------------
       - name: Build Docker image
         run: |
           docker build -t compliance-backend:ci .
 
-      # --------------------------------------------------
-      # 7. Debug GitHub OIDC claims
-      # Temporary verification step
-      # --------------------------------------------------
-      - name: Debug GitHub OIDC claims
-        run: |
-          echo "Requesting GitHub OIDC token..."
-
-          TOKEN=$(curl -sSf \
-            -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
-            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=sts.amazonaws.com" \
-            | python -c "import sys,json; print(json.load(sys.stdin)['value'])")
-
-          export OIDC_TOKEN="$TOKEN"
-
-          python - <<'PY'
-          import os
-          import base64
-          import json
-
-          token = os.environ["OIDC_TOKEN"]
-
-          payload = token.split(".")[1]
-          payload += "=" * (-len(payload) % 4)
-
-          claims = json.loads(
-              base64.urlsafe_b64decode(payload).decode("utf-8")
-          )
-
-          print("OIDC claims:")
-          print("  sub:", claims.get("sub"))
-          print("  aud:", claims.get("aud"))
-          print("  repository:", claims.get("repository"))
-          print("  ref:", claims.get("ref"))
-          print("  repository_owner:", claims.get("repository_owner"))
-          PY
-
-      # --------------------------------------------------
-      # 8. Configure AWS credentials using OIDC
-      # --------------------------------------------------
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v5
         with:
           role-to-assume: arn:aws:iam::361103952701:role/compliance-document-review-github-actions-role
           aws-region: ${{ env.AWS_REGION }}
 
-      # --------------------------------------------------
-      # 9. Verify AWS identity
-      # --------------------------------------------------
       - name: Verify AWS identity
         run: |
           aws sts get-caller-identity
 
-      # --------------------------------------------------
-      # 10. Authenticate Docker with ECR
-      # --------------------------------------------------
       - name: Authenticate Docker with ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      # --------------------------------------------------
-      # 11. Build production image
-      # --------------------------------------------------
       - name: Build production image
         run: |
           ECR_REGISTRY="${{ steps.login-ecr.outputs.registry }}"
@@ -156,9 +89,6 @@ jobs:
             -t "$ECR_REGISTRY/$ECR_REPOSITORY:latest" \
             .
 
-      # --------------------------------------------------
-      # 12. Push production images to ECR
-      # --------------------------------------------------
       - name: Push production images
         run: |
           ECR_REGISTRY="${{ steps.login-ecr.outputs.registry }}"
@@ -169,9 +99,6 @@ jobs:
           docker push \
             "$ECR_REGISTRY/$ECR_REPOSITORY:latest"
 
-      # --------------------------------------------------
-      # 13. Deploy to EC2 through SSM
-      # --------------------------------------------------
       - name: Deploy to EC2
         id: deploy
         run: |
@@ -210,9 +137,6 @@ jobs:
           echo "SSM Command ID: $COMMAND_ID"
           echo "command_id=$COMMAND_ID" >> "$GITHUB_OUTPUT"
 
-      # --------------------------------------------------
-      # 14. Wait for SSM deployment
-      # --------------------------------------------------
       - name: Wait for deployment
         run: |
           COMMAND_ID="${{ steps.deploy.outputs.command_id }}"
