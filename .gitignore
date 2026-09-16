@@ -55,3 +55,12 @@ uploads/*
 *.backup
 test-compliance-document.*
 openapi.json
+# Terraform
+**/.terraform/
+**/terraform.tfstate
+**/terraform.tfstate.*
+**/.terraform.tfstate.lock.info
+
+# Terraform variable files
+**/*.tfvars
+**/*.tfvars.json
