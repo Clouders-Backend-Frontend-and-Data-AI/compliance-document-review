@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from app.api.v1.deps import get_db          
+from app.api.deps import get_db          
 from app.services.ai_assist import AIAssistService
 from app.models.document import Document
 
