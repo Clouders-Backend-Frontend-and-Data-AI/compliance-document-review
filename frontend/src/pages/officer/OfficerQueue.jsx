@@ -29,7 +29,7 @@ export default function OfficerQueue() {
 
   return (
     <div>
-      <h1 className="text-2xl mb-6">Review queue</h1>
+      <h1 className="font-serif text-2xl text-ink mb-6">Review queue</h1>
 
       <div className="flex items-center justify-between gap-4 mb-5">
         <div className="flex gap-2">
@@ -37,10 +37,10 @@ export default function OfficerQueue() {
             <button
               key={f.value}
               onClick={() => setStatus(f.value)}
-              className={`text-sm px-3 py-1.5 border ${
+              className={`text-sm px-3 py-1.5 rounded-sm border transition-colors ${
                 status === f.value
                   ? "border-signal text-signal bg-white"
-                  : "border-hairline text-slate"
+                  : "border-hairline text-slate bg-paper hover:bg-white"
               }`}
             >
               {f.label}
@@ -53,19 +53,19 @@ export default function OfficerQueue() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search by title…"
-          className="w-56 border border-hairline px-3 py-1.5 text-sm bg-white focus:outline-none focus:border-signal"
+          className="w-56 border border-hairline rounded-sm px-3 py-1.5 text-sm bg-white focus:outline-none focus:border-signal"
         />
       </div>
 
       {isLoading && <p className="text-sm text-slate">Loading the queue…</p>}
       {isError && (
-        <p className="text-sm text-rust bg-rustBg px-3 py-2">
+        <p className="text-sm text-rust bg-rustBg rounded-sm px-3 py-2">
           Couldn't load the queue. Try refreshing the page.
         </p>
       )}
 
       {!isLoading && !isError && documents.length === 0 && (
-        <div className="border border-hairline bg-white px-6 py-10 text-center">
+        <div className="border border-hairline bg-white rounded-sm px-6 py-10 text-center">
           <p className="text-ink mb-1">Nothing here</p>
           <p className="text-sm text-slate">
             {query
@@ -76,9 +76,9 @@ export default function OfficerQueue() {
       )}
 
       {documents.length > 0 && (
-        <table className="w-full text-sm bg-white border border-hairline">
+        <table className="w-full text-sm bg-white border border-hairline rounded-sm overflow-hidden">
           <thead>
-            <tr className="border-b border-hairline text-left text-slate">
+            <tr className="border-b border-hairline bg-paper text-left text-slate">
               <th className="px-4 py-3 font-medium">Title</th>
               <th className="px-4 py-3 font-medium">Advisor</th>
               <th className="px-4 py-3 font-medium">Version</th>
@@ -88,7 +88,7 @@ export default function OfficerQueue() {
           </thead>
           <tbody>
             {documents.map((doc) => (
-              <tr key={doc.id} className="border-b border-hairline last:border-b-0 hover:bg-paper">
+              <tr key={doc.id} className="border-b border-hairline last:border-b-0 hover:bg-paper transition-colors">
                 <td className="px-4 py-3">
                   <Link to={`/officer/documents/${doc.id}`} className="text-ink hover:text-signal">
                     {doc.title || `Document ${doc.id}`}
