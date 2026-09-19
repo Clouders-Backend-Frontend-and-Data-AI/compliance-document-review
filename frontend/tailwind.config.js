@@ -20,6 +20,16 @@ export default {
       fontFamily: {
         serif: ["'Source Serif 4'", "Georgia", "serif"],
         sans: ["Inter", "system-ui", "sans-serif"],
+        auth: ["Outfit", "Inter", "system-ui", "sans-serif"],
+      },
+      keyframes: {
+        fadeIn: {
+          from: { opacity: "0", transform: "translateY(-2px)" },
+          to: { opacity: "1", transform: "none" },
+        },
+      },
+      animation: {
+        "fade-in": "fadeIn 0.2s ease-out",
       },
     },
   },
