@@ -222,7 +222,47 @@ RULES_DATA = [
         "description": "Ensuring material is appropriate for the intended recipient audience (retail vs institutional).",
         "rule_text": "Materials targeting retail investors must use plain language and avoid complex derivative concepts unless accompanied by comprehensive risk education.",
         "standard_disclosure": None
-    }
+    },
+    {
+        "rule_code": "SEC-MKT-03",
+        "category": RuleCategory.REQUIRED_DISCLOSURE,
+        "title": "SEC Registration Disclaimer",
+        "description": "Materials must not imply SEC endorsement by virtue of registration.",
+        "rule_text": "Registration with the SEC does not imply a certain level of skill or training and must be disclosed when registration is referenced.",
+        "standard_disclosure": "Registration with the SEC does not imply a certain level of skill or training."
+    },
+    {
+        "rule_code": "PERF-STD-06",
+        "category": RuleCategory.PERFORMANCE_STANDARDS,
+        "title": "Gross vs Net Performance Clarity",
+        "description": "Performance must clarify whether figures are gross or net of fees.",
+        "rule_text": "Any performance figure must state whether it is gross or net of advisory fees and other expenses.",
+        "standard_disclosure": None
+    },
+    {
+        "rule_code": "SEC-PROH-08",
+        "category": RuleCategory.PROHIBITED_CLAIMS,
+        "title": "Urgency / Scarcity Pressure Tactics",
+        "description": "Prohibits artificial scarcity and pressure language in retail marketing.",
+        "rule_text": "Marketing may not use false scarcity or high-pressure tactics such as 'spots running out' without factual basis.",
+        "standard_disclosure": None
+    },
+    {
+        "rule_code": "BANK-DISC-02",
+        "category": RuleCategory.REQUIRED_DISCLOSURE,
+        "title": "Brokerage Account Not a Bank Deposit",
+        "description": "Clarify that securities accounts are not bank deposits.",
+        "rule_text": "Materials referring to cash sweeps or brokerage cash must clarify that balances are not bank deposits and may not be FDIC insured.",
+        "standard_disclosure": "Brokerage cash balances are not bank deposits and may not be FDIC insured."
+    },
+    {
+        "rule_code": "SUPV-04",
+        "category": RuleCategory.SUPERVISION,
+        "title": "Pre-Use Approval Documentation",
+        "description": "Requires documented supervisory approval before retail use.",
+        "rule_text": "Retail communications must evidence pre-use supervisory approval and retain the approval record with the marketing file.",
+        "standard_disclosure": None
+    },
 ]
 
 SAMPLE_PRECEDENT_TEMPLATES = [
@@ -356,6 +396,22 @@ def seed_database():
         current_precedents = db.query(PrecedentSubmission).count()
         
         if current_precedents < 80:
+            # Seed curated templates first (rich, varied officer commentary)
+            for tmpl in SAMPLE_PRECEDENT_TEMPLATES:
+                vec = VectorEngine.generate_embedding(tmpl["text"][:3000])
+                db.add(
+                    PrecedentSubmission(
+                        title=tmpl["title"],
+                        document_type=tmpl["type"],
+                        masked_text=tmpl["text"],
+                        decision=tmpl["decision"],
+                        officer_comment=tmpl["comment"],
+                        embedding_json=json.dumps(vec),
+                        created_at=datetime.now(timezone.utc) - timedelta(days=random.randint(1, 90)),
+                    )
+                )
+            db.commit()
+
             doc_types = [
                 DocumentType.MARKETING_EMAIL,
                 DocumentType.BROCHURE,

@@ -10,7 +10,13 @@ from app.main import app
 from app.models.user import User
 from app.models.base import UserRole
 from app.core.security import get_password_hash, create_access_token
-from scripts.seed_corpus import seed_database
+
+# Test-only plaintext uploads; production remains PDF/DOCX/XLSX
+settings.ENVIRONMENT = "test"
+settings.ALLOW_PLAINTEXT_UPLOADS = True
+settings.ALLOW_INSECURE_DEFAULTS = True
+settings.USE_DATA_ENGINEERING = False
+settings.SECRET_KEY = "test-secret-key-at-least-32-bytes-long!!"
 
 # Use in-memory SQLite for testing
 TEST_DB_URL = "sqlite:///:memory:"

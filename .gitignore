@@ -7,6 +7,7 @@ __pycache__/
 env/
 venv/
 ENV/
+.venv/
 build/
 develop-eggs/
 dist/
@@ -23,30 +24,44 @@ wheels/
 .installed.cfg
 *.egg
 
-# Virtual Environments
-.venv
-venv/
-ENV/
-
 # Testing & Pytest
 .pytest_cache/
 .coverage
 htmlcov/
+.tox/
+.mypy_cache/
+.ruff_cache/
 
 # Environment Variables & Local Secrets
 .env
+.env.local
+.env.*.local
 !.env.example
 
-# Local SQLite Database
+# Local databases & runtime artifacts
 *.db
+*.sqlite3
 compliance_app.db
+ci_compliance.db
 
 # Uploaded Files (keep dir, ignore contents)
 uploads/*
 !uploads/.gitkeep
 
-# IDEs & Editors
+# IDEs & Editors / OS
 .vscode/
 .idea/
 *.swp
 *.swo
+.DS_Store
+Thumbs.db
+
+# Cursor / local agent artifacts
+.cursor/
+canvases/
+
+# Logs / temp
+*.log
+_manual_e2e.py
+_brief_extract.txt
+_count_rules.py
