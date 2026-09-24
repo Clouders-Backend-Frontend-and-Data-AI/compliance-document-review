@@ -1,0 +1,70 @@
+services:
+
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: compliance-postgres
+    restart: unless-stopped
+
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+
+    ports:
+      - "5433:5432"
+
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+    container_name: compliance-backend
+    restart: unless-stopped
+
+    environment:
+      PROJECT_NAME: ${PROJECT_NAME}
+      API_V1_STR: ${API_V1_STR}
+
+      SECRET_KEY: ${SECRET_KEY}
+      ALGORITHM: ${ALGORITHM}
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES}
+
+      DATABASE_URL: ${DATABASE_URL}
+
+      UPLOAD_DIR: ${UPLOAD_DIR}
+      MAX_UPLOAD_SIZE_MB: ${MAX_UPLOAD_SIZE_MB}
+
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      GEMINI_MODEL: ${GEMINI_MODEL}
+      AI_TIMEOUT_SECONDS: ${AI_TIMEOUT_SECONDS}
+
+      DISCLOSURE_ABSENCE_THRESHOLD: ${DISCLOSURE_ABSENCE_THRESHOLD}
+      PRECEDENT_TOP_K: ${PRECEDENT_TOP_K}
+      RULE_RETRIEVAL_TOP_K: ${RULE_RETRIEVAL_TOP_K}
+      USE_DATA_ENGINEERING: ${USE_DATA_ENGINEERING:-true}
+      EMBEDDING_DIMENSION: ${EMBEDDING_DIMENSION:-768}
+
+      BACKEND_CORS_ORIGINS: ${BACKEND_CORS_ORIGINS}
+
+    ports:
+      - "8000:8000"
+
+    volumes:
+      - uploads_data:/app/uploads
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+  uploads_data:

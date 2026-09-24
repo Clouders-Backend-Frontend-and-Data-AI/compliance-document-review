@@ -38,18 +38,43 @@ class AIAssistService:
         # 1. Server-side PII Masking (Mask both title and extracted text)
         raw_text = document.extracted_text or "No text could be extracted from this document."
         full_raw = f"Title: {document.title}\n\n{raw_text}"
-        masked_full, pii_mappings = PIIMasker.mask_text(full_raw, document_id=document.id, db=db)
-        
+        masked_full, pii_mappings = PIIMasker.mask_text(
+            full_raw,
+            document_id=document.id,
+            db=db,
+            replace_mappings=True,
+        )
+
         # Split masked title and masked text
         masked_lines = masked_full.split("\n\n", 1)
         masked_title = masked_lines[0].replace("Title: ", "") if masked_lines else document.title
         masked_text = masked_lines[1] if len(masked_lines) > 1 else masked_full
 
-        # 2. Vector Retrieval: Chunks, Rules, Missing Disclosures, Precedents
+        # 2. Vector Retrieval: prefer data_engineering pgvector when enabled
+        from app.services.de_bridge import (
+            retrieve_missing_disclosures_via_de,
+            retrieve_precedents_via_de,
+            retrieve_rules_via_de,
+        )
+
         chunks = VectorEngine.chunk_text(masked_text)
-        relevant_rules = VectorEngine.retrieve_relevant_rules(db, chunks, top_k=settings.RULE_RETRIEVAL_TOP_K)
-        missing_disclosures = VectorEngine.detect_missing_disclosures(db, chunks)
-        precedents = VectorEngine.search_precedents(db, masked_text, top_k=settings.PRECEDENT_TOP_K)
+        relevant_rules = retrieve_rules_via_de(document.id)
+        if relevant_rules is None:
+            relevant_rules = VectorEngine.retrieve_relevant_rules(
+                db, chunks, top_k=settings.RULE_RETRIEVAL_TOP_K
+            )
+
+        missing_disclosures = retrieve_missing_disclosures_via_de(document.id)
+        if missing_disclosures is None:
+            missing_disclosures = VectorEngine.detect_missing_disclosures(
+                db, chunks, document_type=document.document_type
+            )
+
+        precedents = retrieve_precedents_via_de(document.id)
+        if precedents is None:
+            precedents = VectorEngine.search_precedents(
+                db, masked_text, top_k=settings.PRECEDENT_TOP_K
+            )
 
         # 3. Snapshot the exact outbound payload sent to AI (for privacy verification)
         outbound_payload_snapshot = json.dumps({
@@ -158,7 +183,14 @@ class AIAssistService:
         missing_disclosures: List[Dict[str, Any]]
     ) -> Tuple[str, List[Dict[str, Any]]]:
         """Calls Gemini API with strict structured compliance review prompt"""
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{settings.GEMINI_MODEL}:generateContent?key={settings.GEMINI_API_KEY}"
+        url = (
+            f"https://generativelanguage.googleapis.com/v1beta/models/"
+            f"{settings.GEMINI_MODEL}:generateContent"
+        )
+        headers = {
+            "x-goog-api-key": settings.GEMINI_API_KEY or "",
+            "Content-Type": "application/json",
+        }
 
         prompt = f"""You are a professional Compliance Assist AI for financial marketing materials.
 Review the following masked document text against the retrieved compliance rules and missing disclosures.
@@ -216,7 +248,7 @@ Respond ONLY with valid JSON matching this exact structure:
         }
 
         with httpx.Client(timeout=float(settings.AI_TIMEOUT_SECONDS)) as client:
-            response = client.post(url, json=payload)
+            response = client.post(url, json=payload, headers=headers)
             if response.status_code != 200:
                 raise RuntimeError(f"Gemini API responded with status {response.status_code}: {response.text}")
             
@@ -318,9 +350,15 @@ Respond ONLY with valid JSON matching this exact structure:
     ) -> Dict[str, Any]:
         """Formats the unified AI assist response including precedent matches"""
         if precedents is None:
+            # Remask in-memory only — do not rewrite persisted PII mappings
             raw_text = document.extracted_text or ""
-            masked_text, _ = PIIMasker.mask_text(raw_text, document_id=document.id, db=db)
-            precedents = VectorEngine.search_precedents(db, masked_text, top_k=settings.PRECEDENT_TOP_K)
+            full_raw = f"Title: {document.title}\n\n{raw_text}"
+            masked_full, _ = PIIMasker.mask_text(full_raw)
+            masked_lines = masked_full.split("\n\n", 1)
+            masked_text = masked_lines[1] if len(masked_lines) > 1 else masked_full
+            precedents = VectorEngine.search_precedents(
+                db, masked_text, top_k=settings.PRECEDENT_TOP_K
+            )
 
         flags_out = []
         for f in analysis.flags:
