@@ -9,7 +9,12 @@ class AuditEvent(Base):
     __tablename__ = "audit_events"
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    document_id = Column(String(36), ForeignKey("documents.id"), nullable=False, index=True)
+    document_id = Column(
+        String(36),
+        ForeignKey("documents.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
     actor_id = Column(String(36), ForeignKey("users.id"), nullable=True, index=True)
     actor_name = Column(String(255), nullable=True)
     actor_role = Column(SQLEnum(UserRole), nullable=True)

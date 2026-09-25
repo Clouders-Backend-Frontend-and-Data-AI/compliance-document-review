@@ -87,3 +87,58 @@ def test_full_document_lifecycle_and_revision_threading(
     assert thread_data["documents"][0]["status"] == "needs_revision"
     assert thread_data["documents"][1]["version_number"] == 2
     assert thread_data["documents"][1]["status"] == "approved"
+
+
+def test_duplicate_revision_blocked(client: TestClient, advisor_headers, officer_headers):
+    files = {"file": ("v1.txt", io.BytesIO(b"Version one content"), "text/plain")}
+    res = client.post(
+        "/api/v1/documents/upload",
+        headers=advisor_headers,
+        data={"title": "Dup Rev", "document_type": "brochure"},
+        files=files,
+    )
+    doc_id = res.json()["document"]["id"]
+    client.post(
+        f"/api/v1/documents/{doc_id}/review",
+        headers=officer_headers,
+        json={"status": "needs_revision", "comment": "Fix disclosures"},
+    )
+    files_v2 = {"file": ("v2.txt", io.BytesIO(b"Version two"), "text/plain")}
+    first = client.post(
+        f"/api/v1/documents/{doc_id}/revise",
+        headers=advisor_headers,
+        data={"title": "Dup Rev v2", "document_type": "brochure"},
+        files=files_v2,
+    )
+    assert first.status_code == 201
+    files_v2b = {"file": ("v2b.txt", io.BytesIO(b"Duplicate"), "text/plain")}
+    second = client.post(
+        f"/api/v1/documents/{doc_id}/revise",
+        headers=advisor_headers,
+        data={"title": "Dup Rev v2b", "document_type": "brochure"},
+        files=files_v2b,
+    )
+    assert second.status_code == 400
+
+
+def test_redecision_blocked(client: TestClient, advisor_headers, officer_headers):
+    files = {"file": ("final.txt", io.BytesIO(b"Ready for review"), "text/plain")}
+    res = client.post(
+        "/api/v1/documents/upload",
+        headers=advisor_headers,
+        data={"title": "Terminal", "document_type": "brochure"},
+        files=files,
+    )
+    doc_id = res.json()["document"]["id"]
+    ok = client.post(
+        f"/api/v1/documents/{doc_id}/review",
+        headers=officer_headers,
+        json={"status": "approved", "comment": "Looks good"},
+    )
+    assert ok.status_code == 201
+    again = client.post(
+        f"/api/v1/documents/{doc_id}/review",
+        headers=officer_headers,
+        json={"status": "rejected", "comment": "Changed my mind"},
+    )
+    assert again.status_code == 400

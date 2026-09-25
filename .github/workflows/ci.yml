@@ -4,11 +4,14 @@ on:
   push:
     branches:
       - main
+      - backend
+      - data-engineering
       - devops/infrastructure-setup
-
   pull_request:
     branches:
       - main
+      - backend
+      - data-engineering
       - devops/infrastructure-setup
 
 jobs:
@@ -16,26 +19,13 @@ jobs:
     name: Backend CI
     runs-on: ubuntu-latest
 
-    services:
-      postgres:
-        image: pgvector/pgvector:pg16
-        env:
-          POSTGRES_DB: compliance_db
-          POSTGRES_USER: compliance_user
-          POSTGRES_PASSWORD: ci-test-password
-
-        ports:
-          - 5432:5432
-
-        options: >-
-          --health-cmd "pg_isready -U compliance_user -d compliance_db"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
     env:
-      DATABASE_URL: ${{ secrets.CI_DATABASE_URL }}
-      SECRET_KEY: ${{ secrets.CI_SECRET_KEY }}
+      SECRET_KEY: ci-test-secret-key-not-for-production-use-32chars
+      ALLOW_INSECURE_DEFAULTS: "true"
+      ENVIRONMENT: test
+      ALLOW_PLAINTEXT_UPLOADS: "true"
+      USE_DATA_ENGINEERING: "false"
+      DATABASE_URL: sqlite:///./ci_compliance.db
       UPLOAD_DIR: ${{ github.workspace }}/uploads
       PYTHONPATH: .
 
@@ -55,13 +45,10 @@ jobs:
           pip install -r requirements.txt
 
       - name: Create upload directory
-        run: |
-          mkdir -p "$UPLOAD_DIR"
+        run: mkdir -p "$UPLOAD_DIR"
 
       - name: Run backend tests
-        run: |
-          pytest -v
+        run: pytest -v
 
       - name: Build Docker image
-        run: |
-          docker build -t compliance-backend:ci .
+        run: docker build -t compliance-backend:ci .
