@@ -12,6 +12,8 @@ RUN pip install --upgrade pip && \
     pip install -r requirements.txt
 
 COPY app ./app
+COPY data_engineering ./data_engineering
+COPY scripts ./scripts
 
 RUN mkdir -p /app/uploads
 

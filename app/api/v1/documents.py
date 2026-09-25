@@ -50,7 +50,8 @@ def list_documents(
     - Advisors receive their own submitted documents.
     - Compliance Officers receive the unified queue across all advisors (filterable by status: pending_review, approved, rejected, needs_revision, all).
     """
-    return DocumentService.get_documents_for_user(db=db, user=current_user, status_filter=status)
+    docs = DocumentService.get_documents_for_user(db=db, user=current_user, status_filter=status)
+    return [DocumentService.attach_latest_decision(d) for d in docs]
 
 @router.get("/{document_id}", response_model=DocumentDetailOut)
 def get_document(
@@ -63,7 +64,8 @@ def get_document(
     Advisors can only view documents they submitted. Officers can view any document.
     Access is recorded in the audit trail.
     """
-    return DocumentService.get_document_by_id(db=db, document_id=document_id, user=current_user, log_view=True)
+    doc = DocumentService.get_document_by_id(db=db, document_id=document_id, user=current_user, log_view=True)
+    return DocumentService.attach_latest_decision(doc)
 
 @router.get("/{document_id}/thread", response_model=DocumentThreadOut)
 def get_document_thread(

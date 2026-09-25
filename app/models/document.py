@@ -40,5 +40,6 @@ class Document(Base):
     
     review_decisions = relationship("ReviewDecision", back_populates="document", cascade="all, delete-orphan", order_by="desc(ReviewDecision.decided_at)")
     ai_analysis = relationship("AIAnalysis", back_populates="document", uselist=False, cascade="all, delete-orphan")
-    audit_events = relationship("AuditEvent", back_populates="document", cascade="all, delete-orphan", order_by="asc(AuditEvent.created_at)")
+    # Append-only audit: never cascade-delete compliance events with the document
+    audit_events = relationship("AuditEvent", back_populates="document", passive_deletes=True, order_by="asc(AuditEvent.created_at)")
     pii_mappings = relationship("PIIMapping", back_populates="document", cascade="all, delete-orphan")

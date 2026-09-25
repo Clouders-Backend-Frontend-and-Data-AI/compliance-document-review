@@ -1,13 +1,17 @@
+import hashlib
 import json
 import logging
-from typing import List, Dict, Any, Tuple, Optional
-import numpy as np
+import math
+import re
+from typing import Any, Dict, List, Optional, Tuple
+
 import httpx
+import numpy as np
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
+from app.models.base import DocumentStatus, DocumentType, RuleCategory
 from app.models.vector_corpus import ComplianceRule, PrecedentSubmission
-from app.models.base import RuleCategory, DocumentStatus
 
 logger = logging.getLogger(__name__)
 
@@ -22,128 +26,163 @@ STOP_WORDS = {
     "so", "some", "such", "t", "than", "that", "the", "their", "theirs", "them", "themselves",
     "then", "there", "these", "they", "this", "those", "through", "to", "too", "under", "until",
     "up", "very", "was", "we", "were", "what", "when", "where", "which", "while", "who", "whom",
-    "why", "will", "with", "you", "your", "yours", "yourself", "yourselves"
+    "why", "will", "with", "you", "your", "yours", "yourself", "yourselves",
 }
 
+# Disclosure applicability by document type (reduces false "missing" flags)
+DISCLOSURE_APPLICABILITY: Dict[str, set] = {
+    "BANK-DISC-01": {
+        DocumentType.BROCHURE,
+        DocumentType.PROPOSAL_LETTER,
+        DocumentType.MARKETING_EMAIL,
+        DocumentType.OTHER,
+    },
+    "SOCIAL-DISC-01": {DocumentType.SOCIAL_POST, DocumentType.MARKETING_EMAIL},
+    "SEC-TEST-01": {DocumentType.SOCIAL_POST, DocumentType.MARKETING_EMAIL, DocumentType.BROCHURE},
+}
+
+
+def _stable_hash(token: str, dim: int) -> int:
+    return int(hashlib.md5(token.encode("utf-8")).hexdigest(), 16) % dim
+
+
 class VectorEngine:
-    """
-    Vector similarity & semantic retrieval engine.
-    Supports Google Gemini embeddings API with local normalized TF-IDF / token hashing fallback
-    for 100% reproducible, offline-capable clean checkout.
-    """
+    """Vector similarity & semantic retrieval with a single embedding space."""
+
+    EMBED_DIM = None  # resolved from settings
+
+    @classmethod
+    def embed_dim(cls) -> int:
+        return int(getattr(settings, "EMBEDDING_DIMENSION", 768) or 768)
 
     @classmethod
     def generate_embedding(cls, text: str) -> List[float]:
-        """
-        Generates a normalized embedding vector for the provided (masked) text.
-        Tries Gemini API if key is set; otherwise uses local normalized vectorizer.
-        """
+        dim = cls.embed_dim()
         if not text or not text.strip():
-            return [0.0] * 128
+            return [0.0] * dim
 
         clean_text = text.strip()
+        api_key = (settings.GEMINI_API_KEY or "").strip()
 
-        # Try Google Gemini Embedding API if API key is configured
-        if settings.GEMINI_API_KEY:
+        if api_key:
             try:
-                url = f"https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key={settings.GEMINI_API_KEY}"
+                # Prefer header auth; avoid putting the key in the URL/query string
+                url = (
+                    "https://generativelanguage.googleapis.com/v1beta/models/"
+                    "text-embedding-004:embedContent"
+                )
                 payload = {
                     "model": "models/text-embedding-004",
-                    "content": {"parts": [{"text": clean_text[:2048]}]}
+                    "content": {"parts": [{"text": clean_text[:2048]}]},
+                    "outputDimensionality": dim,
                 }
+                headers = {"x-goog-api-key": api_key, "Content-Type": "application/json"}
                 with httpx.Client(timeout=10.0) as client:
-                    resp = client.post(url, json=payload)
+                    resp = client.post(url, json=payload, headers=headers)
                     if resp.status_code == 200:
                         data = resp.json()
                         values = data.get("embedding", {}).get("values", [])
                         if values:
-                            arr = np.array(values, dtype=np.float32)
-                            norm = np.linalg.norm(arr)
-                            if norm > 0:
-                                arr = arr / norm
-                            return arr.tolist()
-            except Exception as e:
-                logger.warning(f"Gemini embedding API call failed: {e}. Falling back to local vectorizer.")
+                            return cls._normalize_to_dim(values, dim)
+            except Exception as exc:
+                logger.warning("Gemini embedding failed: %s. Using local vectorizer.", exc)
 
-        # Local Deterministic Embedding Fallback
-        return cls._generate_local_embedding(clean_text)
+        return cls._generate_local_embedding(clean_text, dim=dim)
 
     @classmethod
-    def _generate_local_embedding(cls, text: str, dim: int = 128) -> List[float]:
-        """Fast, robust deterministic local embedding based on normalized token and n-gram frequency"""
+    def _normalize_to_dim(cls, values: List[float], dim: int) -> List[float]:
+        arr = np.array(values, dtype=np.float32)
+        if arr.size < dim:
+            arr = np.pad(arr, (0, dim - arr.size))
+        elif arr.size > dim:
+            arr = arr[:dim]
+        norm = np.linalg.norm(arr)
+        if norm > 0:
+            arr = arr / norm
+        return arr.tolist()
+
+    @classmethod
+    def _generate_local_embedding(cls, text: str, dim: int = 768) -> List[float]:
         vec = np.zeros(dim, dtype=np.float32)
-        import re
-        words = re.findall(r'\b[a-z0-9_]{2,}\b', text.lower())
-        filtered_words = [w for w in words if w not in STOP_WORDS]
-        if not filtered_words:
-            filtered_words = words
-
-        for i, word in enumerate(filtered_words):
-            # Unigram hash
-            h1 = abs(hash(word)) % dim
-            vec[h1] += 2.0
-
-            # Bigram hash
+        words = re.findall(r"\b[a-z0-9_]{2,}\b", text.lower())
+        filtered = [w for w in words if w not in STOP_WORDS] or words
+        for i, word in enumerate(filtered):
+            vec[_stable_hash(word, dim)] += 2.0
             if i > 0:
-                h2 = abs(hash(f"{filtered_words[i-1]}_{word}")) % dim
-                vec[h2] += 3.0
-
-        norm = np.linalg.norm(vec)
+                vec[_stable_hash(f"{filtered[i - 1]}_{word}", dim)] += 3.0
+        norm = float(np.linalg.norm(vec))
         if norm > 0:
             vec = vec / norm
         return vec.tolist()
 
     @classmethod
     def chunk_text(cls, text: str, chunk_size: int = 400, overlap: int = 80) -> List[str]:
-        """Splits document text into overlapping paragraph-aware chunks for granular retrieval"""
+        """Overlapping character windows with paragraph preference."""
         if not text:
             return []
-        
+
+        # Prefer DE chunker when available (token-aware + overlap)
+        try:
+            from app.services.de_bridge import chunk_masked_text
+
+            de_chunks = chunk_masked_text(text)
+            if de_chunks:
+                return de_chunks
+        except Exception as exc:
+            logger.debug("DE chunker unavailable: %s", exc)
+
         paragraphs = [p.strip() for p in text.split("\n\n") if p.strip()]
+        if not paragraphs:
+            paragraphs = [text]
+
+        # Sliding windows over joined text to honor overlap
+        joined = "\n\n".join(paragraphs)
+        if len(joined) <= chunk_size:
+            return [joined]
+
+        step = max(1, chunk_size - overlap)
         chunks = []
-        current_chunk = ""
-
-        for p in paragraphs:
-            if len(current_chunk) + len(p) < chunk_size:
-                current_chunk = (current_chunk + "\n\n" + p).strip()
-            else:
-                if current_chunk:
-                    chunks.append(current_chunk)
-                current_chunk = p
-
-        if current_chunk:
-            chunks.append(current_chunk)
-
-        if not chunks:
-            words = text.split()
-            for i in range(0, len(words), 80):
-                chunks.append(" ".join(words[i:i+100]))
-
-        return chunks
+        for start in range(0, len(joined), step):
+            piece = joined[start : start + chunk_size].strip()
+            if piece:
+                chunks.append(piece)
+            if start + chunk_size >= len(joined):
+                break
+        return chunks or [joined]
 
     @classmethod
     def cosine_sim(cls, vec1: List[float], vec2: List[float]) -> float:
         if not vec1 or not vec2:
             return 0.0
-        v1 = np.array(vec1, dtype=np.float32)
-        v2 = np.array(vec2, dtype=np.float32)
-        norm1 = np.linalg.norm(v1)
-        norm2 = np.linalg.norm(v2)
+        dim = min(len(vec1), len(vec2))
+        if dim == 0:
+            return 0.0
+        v1 = np.array(vec1[:dim], dtype=np.float32)
+        v2 = np.array(vec2[:dim], dtype=np.float32)
+        norm1 = float(np.linalg.norm(v1))
+        norm2 = float(np.linalg.norm(v2))
         if norm1 == 0 or norm2 == 0:
             return 0.0
         return float(np.dot(v1, v2) / (norm1 * norm2))
+
+    @classmethod
+    def _load_embedding(cls, embedding_json: Optional[str], fallback_text: str) -> List[float]:
+        if embedding_json:
+            try:
+                values = json.loads(embedding_json)
+                if isinstance(values, list) and values:
+                    return cls._normalize_to_dim(values, cls.embed_dim())
+            except Exception:
+                pass
+        return cls.generate_embedding(fallback_text)
 
     @classmethod
     def retrieve_relevant_rules(
         cls,
         db: Session,
         document_chunks: List[str],
-        top_k: int = 5
+        top_k: int = 5,
     ) -> List[Dict[str, Any]]:
-        """
-        Job 1: Rule lookup.
-        Compares document chunks against compliance rules corpus and returns top relevant rules.
-        """
         rules = db.query(ComplianceRule).all()
         if not rules:
             return []
@@ -155,7 +194,7 @@ class VectorEngine:
             rule_text_to_embed = rule.rule_text + " " + rule.title
             if rule.standard_disclosure:
                 rule_text_to_embed += " " + rule.standard_disclosure
-            rule_vec = cls.generate_embedding(rule_text_to_embed)
+            rule_vec = cls._load_embedding(rule.embedding_json, rule_text_to_embed)
 
             max_score = 0.0
             best_chunk = ""
@@ -164,22 +203,22 @@ class VectorEngine:
                 if sim > max_score:
                     max_score = sim
                     best_chunk = document_chunks[idx]
-
             rule_scores[rule.id] = (max_score, rule, best_chunk)
 
         sorted_rules = sorted(rule_scores.values(), key=lambda x: x[0], reverse=True)
         results = []
         for score, rule, matching_chunk in sorted_rules[:top_k]:
-            results.append({
-                "rule_id": rule.id,
-                "rule_code": rule.rule_code,
-                "category": rule.category.value,
-                "title": rule.title,
-                "rule_text": rule.rule_text,
-                "similarity_score": round(score, 4),
-                "matched_passage": matching_chunk
-            })
-
+            results.append(
+                {
+                    "rule_id": rule.id,
+                    "rule_code": rule.rule_code,
+                    "category": rule.category.value,
+                    "title": rule.title,
+                    "rule_text": rule.rule_text,
+                    "similarity_score": round(score, 4),
+                    "matched_passage": matching_chunk,
+                }
+            )
         return results
 
     @classmethod
@@ -187,89 +226,113 @@ class VectorEngine:
         cls,
         db: Session,
         document_chunks: List[str],
-        threshold: Optional[float] = None
+        threshold: Optional[float] = None,
+        document_type: Optional[DocumentType] = None,
     ) -> List[Dict[str, Any]]:
-        """
-        Job 2: Missing-disclosure detection by absence.
-        A required disclosure is present if some passage in the document sits close to it in vector space.
-        If maximum similarity across all chunks is below the threshold, it is flagged as MISSING.
-        """
         if threshold is None:
             threshold = settings.DISCLOSURE_ABSENCE_THRESHOLD
 
-        disclosure_rules = db.query(ComplianceRule).filter(
-            ComplianceRule.category == RuleCategory.REQUIRED_DISCLOSURE
-        ).all()
-
+        disclosure_rules = (
+            db.query(ComplianceRule)
+            .filter(ComplianceRule.category == RuleCategory.REQUIRED_DISCLOSURE)
+            .all()
+        )
         if not disclosure_rules:
             return []
 
         chunk_embeddings = [cls.generate_embedding(c) for c in document_chunks]
-        missing_disclosures = []
+        joined_lower = " ".join(document_chunks).lower()
+        missing = []
 
         for rule in disclosure_rules:
-            disc_text = rule.standard_disclosure or rule.rule_text
-            disc_vec = cls.generate_embedding(disc_text)
+            applicable = DISCLOSURE_APPLICABILITY.get(rule.rule_code)
+            if document_type is not None and applicable is not None and document_type not in applicable:
+                continue
 
+            disc_text = rule.standard_disclosure or rule.rule_text
+            # Lexical short-circuit: near-verbatim disclosure counts as present
+            # (local hash embeddings can under-score exact paraphrases).
+            disc_lower = (disc_text or "").lower().strip()
+            if disc_lower and (
+                disc_lower in joined_lower
+                or cls._token_overlap_ratio(disc_lower, joined_lower) >= 0.72
+            ):
+                continue
+
+            disc_vec = cls._load_embedding(rule.embedding_json, disc_text)
             max_sim = 0.0
             for c_vec in chunk_embeddings:
-                sim = cls.cosine_sim(c_vec, disc_vec)
-                if sim > max_sim:
-                    max_sim = sim
+                max_sim = max(max_sim, cls.cosine_sim(c_vec, disc_vec))
 
             if max_sim < threshold:
-                missing_disclosures.append({
-                    "rule_id": rule.id,
-                    "rule_code": rule.rule_code,
-                    "title": rule.title,
-                    "standard_disclosure": disc_text,
-                    "max_similarity_found": round(max_sim, 4),
-                    "threshold": threshold,
-                    "reason": f"Required mandatory disclosure '{rule.title}' was not found in any section of the document (Max similarity: {round(max_sim, 2)} < {threshold})."
-                })
+                missing.append(
+                    {
+                        "rule_id": rule.id,
+                        "rule_code": rule.rule_code,
+                        "title": rule.title,
+                        "standard_disclosure": disc_text,
+                        "max_similarity_found": round(max_sim, 4),
+                        "threshold": threshold,
+                        "reason": (
+                            f"Required mandatory disclosure '{rule.title}' was not found "
+                            f"(Max similarity: {round(max_sim, 2)} < {threshold})."
+                        ),
+                    }
+                )
+        return missing
 
-        return missing_disclosures
+    @staticmethod
+    def _token_overlap_ratio(needle: str, haystack: str) -> float:
+        stop = STOP_WORDS
+        n_tokens = {t for t in re.findall(r"[a-z0-9]+", needle) if t not in stop and len(t) > 2}
+        if not n_tokens:
+            return 0.0
+        h_tokens = set(re.findall(r"[a-z0-9]+", haystack))
+        return len(n_tokens & h_tokens) / len(n_tokens)
 
     @classmethod
     def search_precedents(
         cls,
         db: Session,
         masked_document_text: str,
-        top_k: int = 3
+        top_k: int = 3,
     ) -> List[Dict[str, Any]]:
-        """
-        Job 3: Precedent search.
-        Embeds masked document text and queries precedent submissions corpus.
-        Returns top 3 most similar past documents and their decisions + comments.
-        """
-        precedents = db.query(PrecedentSubmission).all()
+        # Prefer final decisions for precedent quality
+        precedents = (
+            db.query(PrecedentSubmission)
+            .filter(
+                PrecedentSubmission.decision.in_(
+                    [DocumentStatus.APPROVED, DocumentStatus.REJECTED]
+                )
+            )
+            .all()
+        )
+        if not precedents:
+            precedents = db.query(PrecedentSubmission).all()
         if not precedents:
             return []
 
         doc_vec = cls.generate_embedding(masked_document_text[:3000])
         matches = []
-
         for p in precedents:
-            p_vec = cls.generate_embedding(p.masked_text[:3000])
-            sim = cls.cosine_sim(doc_vec, p_vec)
-            matches.append((sim, p))
+            p_vec = cls._load_embedding(p.embedding_json, p.masked_text[:3000])
+            matches.append((cls.cosine_sim(doc_vec, p_vec), p))
 
         matches.sort(key=lambda x: x[0], reverse=True)
-        top_matches = matches[:top_k]
-
         results = []
-        for sim, p in top_matches:
+        for sim, p in matches[:top_k]:
             snippet = p.masked_text[:200] + ("..." if len(p.masked_text) > 200 else "")
-            results.append({
-                "id": p.id,
-                "title": p.title,
-                "document_type": p.document_type.value,
-                "masked_text_snippet": snippet,
-                "decision": p.decision.value,
-                "officer_comment": p.officer_comment,
-                "similarity_score": round(sim, 4)
-            })
-
+            results.append(
+                {
+                    "id": p.id,
+                    "title": p.title,
+                    "document_type": p.document_type.value,
+                    "masked_text_snippet": snippet,
+                    "decision": p.decision.value,
+                    "officer_comment": p.officer_comment,
+                    "similarity_score": round(sim, 4),
+                }
+            )
         return results
 
     @classmethod
@@ -281,10 +344,29 @@ class VectorEngine:
         document_type: Any,
         masked_text: str,
         decision: DocumentStatus,
-        officer_comment: str
-    ) -> PrecedentSubmission:
-        """Indexes an approved/rejected/revised document into the precedent vector store"""
+        officer_comment: str,
+    ) -> Optional[PrecedentSubmission]:
+        """Index approved/rejected docs once (upsert by source_document_id). Skip needs_revision."""
+        if decision == DocumentStatus.NEEDS_REVISION:
+            return None
+
         vec = cls.generate_embedding(masked_text[:3000])
+        existing = (
+            db.query(PrecedentSubmission)
+            .filter(PrecedentSubmission.source_document_id == document_id)
+            .first()
+        )
+        if existing:
+            existing.title = title
+            existing.document_type = document_type
+            existing.masked_text = masked_text
+            existing.decision = decision
+            existing.officer_comment = officer_comment
+            existing.embedding_json = json.dumps(vec)
+            db.commit()
+            db.refresh(existing)
+            return existing
+
         precedent = PrecedentSubmission(
             title=title,
             document_type=document_type,
@@ -292,7 +374,7 @@ class VectorEngine:
             decision=decision,
             officer_comment=officer_comment,
             source_document_id=document_id,
-            embedding_json=json.dumps(vec)
+            embedding_json=json.dumps(vec),
         )
         db.add(precedent)
         db.commit()
