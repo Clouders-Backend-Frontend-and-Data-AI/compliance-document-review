@@ -65,3 +65,14 @@ canvases/
 _manual_e2e.py
 _brief_extract.txt
 _count_rules.py
+*.backup
+test-compliance-document.*
+openapi.json
+
+# Terraform
+**/.terraform/
+**/terraform.tfstate
+**/terraform.tfstate.*
+**/.terraform.tfstate.lock.info
+**/*.tfvars
+**/*.tfvars.json

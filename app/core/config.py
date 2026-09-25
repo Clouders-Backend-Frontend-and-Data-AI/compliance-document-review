@@ -1,4 +1,3 @@
-import os
 from typing import List, Optional, Union
 
 from pydantic import Field, field_validator
@@ -72,6 +71,8 @@ class Settings(BaseSettings):
             "super-secret-key-for-jwt-change-in-production",
             "secret",
             "changeme",
+            "CHANGE-ME-IN-PRODUCTION",
+            "replace-with-a-long-random-string",
         }
         return (self.SECRET_KEY or "").strip() in insecure
 
