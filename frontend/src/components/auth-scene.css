@@ -1,0 +1,136 @@
+/* Entrance + scene animation for the auth pages. All motion is disabled when the
+   visitor has asked their system for reduced motion (see the bottom of the file). */
+
+@keyframes auth-rise {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes scene-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes scene-fly {
+  from { transform: translate(var(--x0), 0); }
+  to   { transform: translate(var(--x1), var(--dy, -46px)); }
+}
+@keyframes scene-wing-l {
+  from { transform: rotate(-16deg); }
+  to   { transform: rotate(30deg); }
+}
+@keyframes scene-wing-r {
+  from { transform: rotate(16deg); }
+  to   { transform: rotate(-30deg); }
+}
+@keyframes scene-drift {
+  from { transform: translateX(-36px); }
+  to   { transform: translateX(44px); }
+}
+@keyframes scene-glow {
+  from { transform: scale(1);    opacity: 0.8; }
+  to   { transform: scale(1.09); opacity: 1; }
+}
+@keyframes scene-twinkle {
+  0%, 100% { opacity: 0.2; }
+  50%      { opacity: 1; }
+}
+@keyframes scene-shimmer {
+  from { transform: translateX(-6px); opacity: 0.3; }
+  to   { transform: translateX(6px);  opacity: 0.75; }
+}
+@keyframes scene-flicker {
+  0%, 100% { opacity: 1; }
+  45%      { opacity: 0.7; }
+  60%      { opacity: 0.95; }
+}
+@keyframes scene-sway {
+  from { transform: rotate(-2.5deg); }
+  to   { transform: rotate(3deg); }
+}
+
+/* Left column: wordmark, title and each form row rise in one after another. */
+.auth-rise {
+  animation: auth-rise 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  animation-delay: var(--d, 0ms);
+}
+.auth-enter form > *:not([role="alert"]) {
+  animation: auth-rise 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+.auth-enter form > *:nth-child(1) { animation-delay: 200ms; }
+.auth-enter form > *:nth-child(2) { animation-delay: 270ms; }
+.auth-enter form > *:nth-child(3) { animation-delay: 340ms; }
+.auth-enter form > *:nth-child(4) { animation-delay: 410ms; }
+.auth-enter form > *:nth-child(5) { animation-delay: 480ms; }
+.auth-enter form > *:nth-child(6) { animation-delay: 550ms; }
+.auth-enter form > *:nth-child(7) { animation-delay: 620ms; }
+
+/* Right panel scene. */
+.scene { animation: scene-in 1.2s ease-out both; }
+
+.scene-fly {
+  animation: scene-fly var(--fly, 40s) linear infinite;
+  animation-delay: var(--delay, 0s);
+}
+.scene-wing-l {
+  transform-origin: 0 0;
+  animation: scene-wing-l var(--flap, 0.8s) ease-in-out infinite alternate;
+}
+.scene-wing-r {
+  transform-origin: 0 0;
+  animation: scene-wing-r var(--flap, 0.8s) ease-in-out infinite alternate;
+}
+.scene-drift {
+  animation: scene-drift var(--dur, 50s) ease-in-out infinite alternate;
+  animation-delay: var(--delay, 0s);
+}
+.scene-glow {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: scene-glow 7s ease-in-out infinite alternate;
+}
+.scene-star {
+  animation: scene-twinkle var(--dur, 4s) ease-in-out infinite;
+  animation-delay: var(--delay, 0s);
+}
+.scene-shimmer {
+  animation: scene-shimmer var(--dur, 3.5s) ease-in-out infinite alternate;
+  animation-delay: var(--delay, 0s);
+}
+.scene-window {
+  animation: scene-flicker var(--dur, 6s) ease-in-out infinite;
+  animation-delay: var(--delay, 0s);
+}
+.scene-reed {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+  animation: scene-sway var(--dur, 4s) ease-in-out infinite alternate;
+  animation-delay: var(--delay, 0s);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .auth-rise,
+  .auth-enter form > *,
+  .scene,
+  .scene * {
+    animation: none !important;
+  }
+}
+
+/* Dawn scene (signup): rotating sun rays and bobbing sailboats. */
+@keyframes scene-rays {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+@keyframes scene-bob {
+  from { transform: translateY(0) rotate(-1.2deg); }
+  to   { transform: translateY(2px) rotate(1.4deg); }
+}
+.scene-rays {
+  transform-box: view-box;
+  transform-origin: 400px 552px;
+  animation: scene-rays 160s linear infinite;
+}
+.scene-bob {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+  animation: scene-bob var(--dur, 4s) ease-in-out infinite alternate;
+}

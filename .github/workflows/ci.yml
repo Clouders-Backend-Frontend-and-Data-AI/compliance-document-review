@@ -2,9 +2,17 @@ name: Compliance App CI
 
 on:
   push:
-    branches: [main, data-engineering]
+    branches:
+      - main
+      - backend
+      - data-engineering
+      - devops/infrastructure-setup
   pull_request:
-    branches: [main, data-engineering]
+    branches:
+      - main
+      - backend
+      - data-engineering
+      - devops/infrastructure-setup
 
 jobs:
   backend-ci:
@@ -41,3 +49,6 @@ jobs:
 
       - name: Run backend tests
         run: pytest -v
+
+      - name: Build Docker image
+        run: docker build -t compliance-backend:ci .

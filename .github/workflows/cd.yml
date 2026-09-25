@@ -1,0 +1,188 @@
+name: Compliance App CD
+
+on:
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REPOSITORY: compliance-document-review
+  EC2_INSTANCE_ID: i-0d7fd39de856eb288
+
+jobs:
+  deploy:
+    name: Test and Deploy
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_DB: compliance_db
+          POSTGRES_USER: compliance_user
+          POSTGRES_PASSWORD: ci-test-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U compliance_user -d compliance_db"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: ${{ secrets.CI_DATABASE_URL }}
+      SECRET_KEY: ${{ secrets.CI_SECRET_KEY }}
+      UPLOAD_DIR: ${{ github.workspace }}/uploads
+      PYTHONPATH: .
+
+    steps:
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Create upload directory
+        run: |
+          mkdir -p "$UPLOAD_DIR"
+
+      - name: Run backend tests
+        run: |
+          pytest -v
+
+      - name: Build Docker image
+        run: |
+          docker build -t compliance-backend:ci .
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v5
+        with:
+          role-to-assume: arn:aws:iam::361103952701:role/compliance-document-review-github-actions-role
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Verify AWS identity
+        run: |
+          aws sts get-caller-identity
+
+      - name: Authenticate Docker with ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build production image
+        run: |
+          ECR_REGISTRY="${{ steps.login-ecr.outputs.registry }}"
+
+          docker build \
+            -t "$ECR_REGISTRY/$ECR_REPOSITORY:${{ github.sha }}" \
+            -t "$ECR_REGISTRY/$ECR_REPOSITORY:latest" \
+            .
+
+      - name: Push production images
+        run: |
+          ECR_REGISTRY="${{ steps.login-ecr.outputs.registry }}"
+
+          docker push \
+            "$ECR_REGISTRY/$ECR_REPOSITORY:${{ github.sha }}"
+
+          docker push \
+            "$ECR_REGISTRY/$ECR_REPOSITORY:latest"
+
+      - name: Deploy to EC2
+        id: deploy
+        run: |
+          COMMAND_ID=$(aws ssm send-command \
+            --instance-ids "$EC2_INSTANCE_ID" \
+            --document-name "AWS-RunShellScript" \
+            --comment "Deploy Compliance Document Review ${{ github.sha }}" \
+            --parameters 'commands=[
+              "set -e",
+              "echo \"Logging into Amazon ECR...\"",
+              "aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 361103952701.dkr.ecr.us-east-1.amazonaws.com",
+              "echo \"Pulling image ${{ github.sha }}...\"",
+              "docker pull 361103952701.dkr.ecr.us-east-1.amazonaws.com/compliance-document-review:${{ github.sha }}",
+              "echo \"Retrieving application secrets...\"",
+              "SECRET_JSON=$(aws secretsmanager get-secret-value --secret-id compliance-document-review/production/app --query SecretString --output text --region us-east-1)",
+              "export DATABASE_URL=$(echo \"$SECRET_JSON\" | python3 -c \"import sys,json; print(json.load(sys.stdin)[\\\"DATABASE_URL\\\"])\")",
+              "export SECRET_KEY=$(echo \"$SECRET_JSON\" | python3 -c \"import sys,json; print(json.load(sys.stdin)[\\\"SECRET_KEY\\\"])\")",
+              "unset SECRET_JSON",
+              "echo \"Preparing Docker network...\"",
+              "docker network inspect compliance-net >/dev/null 2>&1 || docker network create compliance-net",
+              "echo \"Removing previous backend container...\"",
+              "docker rm -f compliance-backend >/dev/null 2>&1 || true",
+              "echo \"Starting new backend container...\"",
+              "docker run -d --name compliance-backend --restart unless-stopped --network compliance-net -p 8000:8000 -e DATABASE_URL=\"$DATABASE_URL\" -e SECRET_KEY=\"$SECRET_KEY\" -e UPLOAD_DIR=/app/uploads -e PYTHONUNBUFFERED=1 361103952701.dkr.ecr.us-east-1.amazonaws.com/compliance-document-review:${{ github.sha }}",
+              "unset DATABASE_URL SECRET_KEY",
+              "echo \"Waiting for application startup...\"",
+              "sleep 10",
+              "echo \"Running health check...\"",
+              "curl --fail --silent --show-error http://localhost:8000/api/v1/health",
+              "echo",
+              "echo \"Deployment completed successfully.\""
+            ]' \
+            --query 'Command.CommandId' \
+            --output text)
+
+          echo "SSM Command ID: $COMMAND_ID"
+          echo "command_id=$COMMAND_ID" >> "$GITHUB_OUTPUT"
+
+      - name: Wait for deployment
+        run: |
+          COMMAND_ID="${{ steps.deploy.outputs.command_id }}"
+
+          echo "Waiting for SSM command to complete..."
+
+          for i in {1..30}; do
+            STATUS=$(aws ssm get-command-invocation \
+              --command-id "$COMMAND_ID" \
+              --instance-id "$EC2_INSTANCE_ID" \
+              --query 'Status' \
+              --output text)
+
+            echo "Deployment status: $STATUS"
+
+            case "$STATUS" in
+              Success)
+                echo "Deployment succeeded."
+                exit 0
+                ;;
+
+              Failed|Cancelled|TimedOut|Cancelling)
+                echo "Deployment failed with status: $STATUS"
+
+                echo "----- SSM stdout -----"
+                aws ssm get-command-invocation \
+                  --command-id "$COMMAND_ID" \
+                  --instance-id "$EC2_INSTANCE_ID" \
+                  --query 'StandardOutputContent' \
+                  --output text || true
+
+                echo "----- SSM stderr -----"
+                aws ssm get-command-invocation \
+                  --command-id "$COMMAND_ID" \
+                  --instance-id "$EC2_INSTANCE_ID" \
+                  --query 'StandardErrorContent' \
+                  --output text || true
+
+                exit 1
+                ;;
+
+              *)
+                sleep 10
+                ;;
+            esac
+          done
+
+          echo "Deployment timed out waiting for SSM."
+          exit 1
