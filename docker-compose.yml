@@ -10,14 +10,15 @@ services:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
 
+    # Bind to localhost only — do not expose DB publicly
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
 
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -33,10 +34,13 @@ services:
     environment:
       PROJECT_NAME: ${PROJECT_NAME}
       API_V1_STR: ${API_V1_STR}
+      ENVIRONMENT: ${ENVIRONMENT:-production}
+      ALLOW_INSECURE_DEFAULTS: ${ALLOW_INSECURE_DEFAULTS:-false}
+      ALLOW_OFFICER_SIGNUP: ${ALLOW_OFFICER_SIGNUP:-false}
 
       SECRET_KEY: ${SECRET_KEY}
       ALGORITHM: ${ALGORITHM}
-      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES}
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-60}
 
       DATABASE_URL: ${DATABASE_URL}
 
@@ -50,8 +54,11 @@ services:
       DISCLOSURE_ABSENCE_THRESHOLD: ${DISCLOSURE_ABSENCE_THRESHOLD}
       PRECEDENT_TOP_K: ${PRECEDENT_TOP_K}
       RULE_RETRIEVAL_TOP_K: ${RULE_RETRIEVAL_TOP_K}
+      USE_DATA_ENGINEERING: ${USE_DATA_ENGINEERING:-true}
+      EMBEDDING_DIMENSION: ${EMBEDDING_DIMENSION:-768}
 
       BACKEND_CORS_ORIGINS: ${BACKEND_CORS_ORIGINS}
+      ALLOWED_HOSTS: ${ALLOWED_HOSTS:-localhost,127.0.0.1}
 
     ports:
       - "8000:8000"
