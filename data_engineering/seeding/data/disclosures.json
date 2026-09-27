@@ -1,0 +1,50 @@
+[
+  {
+    "disclosure_code": "DISC-001",
+    "title": "Investment Risk Disclosure",
+    "body": "The document must disclose the risks associated with the recommended investment products and strategies.",
+    "is_mandatory": true
+  },
+  {
+    "disclosure_code": "DISC-002",
+    "title": "Fees and Charges Disclosure",
+    "body": "The document must clearly disclose applicable fees, charges, commissions, and other costs.",
+    "is_mandatory": true
+  },
+  {
+    "disclosure_code": "DISC-003",
+    "title": "Client Objectives Disclosure",
+    "body": "The document must state the client's investment objectives and financial goals.",
+    "is_mandatory": true
+  },
+  {
+    "disclosure_code": "DISC-004",
+    "title": "Suitability Disclosure",
+    "body": "The document must provide information supporting the suitability of the recommended investment for the client.",
+    "is_mandatory": true
+  },
+  {
+    "disclosure_code": "DISC-005",
+    "title": "Conflicts of Interest Disclosure",
+    "body": "The document must disclose relevant conflicts of interest that could affect the recommendation.",
+    "is_mandatory": true
+  },
+  {
+    "disclosure_code": "DISC-006",
+    "title": "Product Information Disclosure",
+    "body": "The document must provide sufficient information about the financial products being recommended.",
+    "is_mandatory": true
+  },
+  {
+    "disclosure_code": "DISC-007",
+    "title": "Performance Information Disclosure",
+    "body": "Where performance information is presented, the document must provide appropriate context and supporting information.",
+    "is_mandatory": true
+  },
+  {
+    "disclosure_code": "DISC-008",
+    "title": "Regulatory Disclosure",
+    "body": "The document must include applicable regulatory and compliance disclosures required for the financial service or product.",
+    "is_mandatory": true
+  }
+]

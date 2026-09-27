@@ -67,7 +67,7 @@ def chunk_masked_text(masked_text: str) -> List[str]:
 
 
 def try_ingest_document(document_id: str, file_bytes: bytes, filename: str) -> Optional[dict]:
-    """Full DE ingest (extract→mask→chunk→embed→store) when pgvector is enabled."""
+    """Full DE ingest when pgvector is enabled. Soft-fails if DE tables are missing."""
     if not data_engineering_pg_enabled():
         return None
     try:
@@ -75,24 +75,32 @@ def try_ingest_document(document_id: str, file_bytes: bytes, filename: str) -> O
 
         return ingest_document(document_id, file_bytes, filename)
     except Exception as exc:
-        logger.exception("data_engineering.ingest_document failed: %s", exc)
-        raise
+        logger.warning("data_engineering.ingest_document skipped: %s", exc)
+        return None
 
 
 def retrieve_rules_via_de(document_id: str) -> Optional[List[Dict[str, Any]]]:
     if not data_engineering_pg_enabled():
         return None
-    from data_engineering import RuleRetriever
+    try:
+        from data_engineering import RuleRetriever
 
-    return RuleRetriever().retrieve_for_document(document_id)
+        return RuleRetriever().retrieve_for_document(document_id)
+    except Exception as exc:
+        logger.warning("DE rule retrieval skipped: %s", exc)
+        return None
 
 
 def retrieve_missing_disclosures_via_de(document_id: str) -> Optional[List[Dict[str, Any]]]:
     if not data_engineering_pg_enabled():
         return None
-    from data_engineering import DisclosureRetriever
+    try:
+        from data_engineering import DisclosureRetriever
 
-    results = DisclosureRetriever().check_document(document_id)
+        results = DisclosureRetriever().check_document(document_id)
+    except Exception as exc:
+        logger.warning("DE disclosure retrieval skipped: %s", exc)
+        return None
     missing = []
     for r in results:
         if getattr(r, "is_present", True):
@@ -114,21 +122,57 @@ def retrieve_missing_disclosures_via_de(document_id: str) -> Optional[List[Dict[
 def retrieve_precedents_via_de(document_id: str) -> Optional[List[Dict[str, Any]]]:
     if not data_engineering_pg_enabled():
         return None
-    from data_engineering import PrecedentRetriever
+    try:
+        from data_engineering import PrecedentRetriever
 
-    results = PrecedentRetriever().retrieve(document_id)
+        results = PrecedentRetriever().retrieve(document_id)
+    except Exception as exc:
+        logger.warning("DE precedent retrieval skipped: %s", exc)
+        return None
     return [
         {
             "id": getattr(r, "document_id", None),
-            "title": "",
+            "title": f"Precedent {getattr(r, 'document_id', '')}",
             "document_type": "other",
-            "masked_text_snippet": "",
+            "masked_text_snippet": (getattr(r, "officer_comment", None) or "")[:200],
             "decision": getattr(r, "decision", None),
             "officer_comment": getattr(r, "officer_comment", None),
             "similarity_score": round(float(getattr(r, "similarity", 0.0)), 4),
+            "decided_at": getattr(r, "decided_at", None),
         }
         for r in results
     ]
+
+
+def index_precedent_via_de(
+    document_id: str,
+    masked_text: str,
+    decision: str,
+    officer_comment: str,
+) -> bool:
+    """Index officer decision into DE precedent_index when Postgres/pgvector is enabled."""
+    if not data_engineering_pg_enabled():
+        return False
+    try:
+        from datetime import datetime, timezone
+
+        from data_engineering import PrecedentRetriever
+        from data_engineering.embedding.embedder import EmbeddingClient
+
+        summary = (masked_text or "")[:3000]
+        embedding = EmbeddingClient().embed_single(summary)
+        PrecedentRetriever().index_document(
+            document_id=document_id,
+            masked_summary=summary,
+            decision=decision,
+            officer_comment=officer_comment,
+            decided_at=datetime.now(timezone.utc).isoformat(),
+            embedding=embedding,
+        )
+        return True
+    except Exception as exc:
+        logger.warning("DE precedent indexing skipped: %s", exc)
+        return False
 
 
 def persist_pii_mappings(

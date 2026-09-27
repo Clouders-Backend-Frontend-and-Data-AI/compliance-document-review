@@ -22,10 +22,13 @@ jobs:
     env:
       SECRET_KEY: ci-test-secret-key-not-for-production-use-32chars
       ALLOW_INSECURE_DEFAULTS: "true"
+      ALLOW_OFFICER_SIGNUP: "true"
+      ENABLE_RATE_LIMITING: "false"
       ENVIRONMENT: test
       ALLOW_PLAINTEXT_UPLOADS: "true"
       USE_DATA_ENGINEERING: "false"
       DATABASE_URL: sqlite:///./ci_compliance.db
+      ALLOWED_HOSTS: localhost,127.0.0.1,testserver
       UPLOAD_DIR: ${{ github.workspace }}/uploads
       PYTHONPATH: .
 

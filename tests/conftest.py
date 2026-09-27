@@ -5,18 +5,22 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from app.core.config import settings
+
+# Configure test settings BEFORE importing the FastAPI app
+settings.ENVIRONMENT = "test"
+settings.ALLOW_PLAINTEXT_UPLOADS = True
+settings.ALLOW_INSECURE_DEFAULTS = True
+settings.ALLOW_OFFICER_SIGNUP = True
+settings.ENABLE_RATE_LIMITING = False
+settings.USE_DATA_ENGINEERING = False
+settings.SECRET_KEY = "test-secret-key-at-least-32-bytes-long!!"
+settings.ALLOWED_HOSTS = ["testserver", "localhost", "127.0.0.1"]
+
 from app.core.database import Base, get_db_session
 from app.main import app
 from app.models.user import User
 from app.models.base import UserRole
 from app.core.security import get_password_hash, create_access_token
-
-# Test-only plaintext uploads; production remains PDF/DOCX/XLSX
-settings.ENVIRONMENT = "test"
-settings.ALLOW_PLAINTEXT_UPLOADS = True
-settings.ALLOW_INSECURE_DEFAULTS = True
-settings.USE_DATA_ENGINEERING = False
-settings.SECRET_KEY = "test-secret-key-at-least-32-bytes-long!!"
 
 # Use in-memory SQLite for testing
 TEST_DB_URL = "sqlite:///:memory:"

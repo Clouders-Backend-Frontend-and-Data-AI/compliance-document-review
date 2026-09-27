@@ -88,8 +88,33 @@ class DocumentService:
         with open(dest_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
 
-        mime_type = file.content_type or "application/octet-stream"
+        # Content sniffing (magic bytes) — reject extension spoofing for office/PDF
+        mime_type = cls._sniff_and_validate_mime(dest_path, ext, file.content_type)
         return dest_path, original_name, size_bytes, mime_type
+
+    @staticmethod
+    def _sniff_and_validate_mime(path: str, ext: str, client_mime: Optional[str]) -> str:
+        with open(path, "rb") as fh:
+            header = fh.read(8)
+
+        expected = {
+            ".pdf": (b"%PDF", "application/pdf"),
+            ".docx": (b"PK", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"),
+            ".xlsx": (b"PK", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
+            ".txt": (None, "text/plain"),
+            ".md": (None, "text/markdown"),
+        }
+        magic, default_mime = expected.get(ext, (None, client_mime or "application/octet-stream"))
+        if magic is not None and not header.startswith(magic):
+            try:
+                os.remove(path)
+            except OSError:
+                pass
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"File content does not match extension '{ext}'.",
+            )
+        return default_mime
 
     @classmethod
     def _extract_or_fail(cls, file_path: str, mime_type: str, file_name: str) -> str:
@@ -388,6 +413,18 @@ class DocumentService:
                 decision=decision_status,
                 officer_comment=comment,
             )
+            # Also index into data_engineering pgvector precedent store when enabled
+            try:
+                from app.services.de_bridge import index_precedent_via_de
+
+                index_precedent_via_de(
+                    document_id=doc.id,
+                    masked_text=masked_text,
+                    decision=decision_status.value,
+                    officer_comment=comment,
+                )
+            except Exception as de_exc:
+                logger.warning("DE precedent index skipped: %s", de_exc)
         except Exception as exc:
             logger.exception("Precedent indexing failed for %s: %s", doc.id, exc)
 
