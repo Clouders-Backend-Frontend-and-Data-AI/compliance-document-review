@@ -42,7 +42,7 @@ class Settings(BaseSettings):
         ]
     )
     ALLOWED_HOSTS: Union[List[str], str] = Field(
-        default_factory=lambda: ["localhost", "127.0.0.1", "testserver"]
+        default_factory=lambda: ["localhost", "127.0.0.1", "testserver","compliance-document-review.onrender.com"]
     )
 
     # Rate limits (per IP, sliding window approx)
